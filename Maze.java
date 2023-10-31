@@ -1,5 +1,7 @@
 import java.awt.*;
 import javax.swing.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 /**
  * Creates a random maze, then solves it by finding a path from the
@@ -7,7 +9,7 @@ import javax.swing.*;
  * one maze, it waits a while then starts over by creating a
  * new random maze.)
  */
-public class Maze extends JPanel implements Runnable {
+public class Maze extends JPanel implements ActionListener, Runnable {
 
     // a main routine makes it possible to run this class as a program
     public static void main(String[] args) {
@@ -56,6 +58,7 @@ public class Maze extends JPanel implements Runnable {
     boolean mazeExists = false; // set to true when maze[][] is valid; used in
                                 // redrawMaze(); set to true in createMaze(), and
                                 // reset to false in run()
+    private boolean isGenerating = false;
 
     public Maze() {
         color = new Color[] {
@@ -67,7 +70,24 @@ public class Maze extends JPanel implements Runnable {
         };
         setBackground(color[backgroundCode]);
         setPreferredSize(new Dimension(blockSize * columns, blockSize * rows));
-        new Thread(this).start();
+
+        JButton startButton = new JButton("Start");
+        startButton.addActionListener(this);
+        add(startButton);
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        if (!isGenerating) {
+            new Thread(this::generateAndSolveMaze).start();
+        }
+    }
+
+    private void generateAndSolveMaze() {
+        isGenerating = true;
+        makeMaze();
+        solveMaze(1, 1);
+        isGenerating = false;
     }
 
 
@@ -109,24 +129,7 @@ public class Maze extends JPanel implements Runnable {
     }
 
     public void run() {
-        // run method for thread repeatedly makes a maze and then solves it
-        try {
-            Thread.sleep(1000);
-        } // wait a bit before starting
-        catch (InterruptedException e) {
-        }
-        while (true) {
-            makeMaze();
-            solveMaze(1, 1);
-            synchronized (this) {
-                try {
-                    wait(sleepTime);
-                } catch (InterruptedException e) {
-                }
-            }
-            mazeExists = false;
-            repaint();
-        }
+        
     }
     
     
