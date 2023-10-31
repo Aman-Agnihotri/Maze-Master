@@ -21,7 +21,6 @@ public class Maze extends JPanel implements ActionListener {
         window.setVisible(true);
     }
 
-
     int[][] maze; // Description of state of maze. The value of maze[i][j]
                   // is one of the constants wallCode, pathcode, emptyCode,
                   // or visitedCode. (Value can also be negative, temporarily,
@@ -59,7 +58,7 @@ public class Maze extends JPanel implements ActionListener {
                                 // redrawMaze(); set to true in createMaze(), and
                                 // reset to false in run()
     private boolean isGenerating = false;
-
+    private JButton resetButton;
     public Maze() {
         color = new Color[] {
                 new Color(200, 0, 0),
@@ -75,7 +74,7 @@ public class Maze extends JPanel implements ActionListener {
         startButton.addActionListener(this);
         add(startButton);
 
-        JButton resetButton = new JButton("Reset");
+        resetButton = new JButton("Reset");
         resetButton.addActionListener(e -> resetMaze());
         add(resetButton);
     }
@@ -94,7 +93,6 @@ public class Maze extends JPanel implements ActionListener {
         isGenerating = false;
     }
 
-
     void checkSize() {
         // Called before drawing the maze, to set parameters used for drawing.
         if (getWidth() != width || getHeight() != height) {
@@ -109,7 +107,6 @@ public class Maze extends JPanel implements ActionListener {
         }
     }
     
-
     protected synchronized void paintComponent(Graphics g) {
         super.paintComponent(g);
         checkSize();
@@ -133,10 +130,12 @@ public class Maze extends JPanel implements ActionListener {
     }
     
     private void resetMaze() {
-        // Reset the maze by clearing the maze data and repainting the panel.
-        maze = null;
-        mazeExists = false;
-        repaint();
+        if (!isGenerating) {
+            // Reset the maze only if not generating the maze.
+            maze = null;
+            mazeExists = false;
+            repaint();
+        }
     }
     
     void makeMaze() {
