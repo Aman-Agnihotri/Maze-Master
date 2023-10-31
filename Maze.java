@@ -9,7 +9,7 @@ import java.awt.event.ActionListener;
  * one maze, it waits a while then starts over by creating a
  * new random maze.)
  */
-public class Maze extends JPanel implements ActionListener, Runnable {
+public class Maze extends JPanel implements ActionListener {
 
     // a main routine makes it possible to run this class as a program
     public static void main(String[] args) {
@@ -131,15 +131,6 @@ public class Maze extends JPanel implements ActionListener, Runnable {
                 }
         }
     }
-
-    public void run() {
-        if (!isGenerating) {
-            isGenerating = true;
-            makeMaze();
-            solveMaze(1, 1);
-            isGenerating = false;
-        }
-    }
     
     private void resetMaze() {
         // Reset the maze by clearing the maze data and repainting the panel.
@@ -148,7 +139,6 @@ public class Maze extends JPanel implements ActionListener, Runnable {
         repaint();
     }
     
-
     void makeMaze() {
         // Create a random maze. The strategy is to start with
         // a grid of disconnected "rooms" separated by walls.
@@ -194,7 +184,6 @@ public class Maze extends JPanel implements ActionListener, Runnable {
                 if (maze[i][j] < 0)
                     maze[i][j] = emptyCode;
     }
-    
 
     synchronized void tearDown(int row, int col) {
         // Tear down a wall, unless doing so will form a loop. Tearing down a wall
@@ -225,7 +214,6 @@ public class Maze extends JPanel implements ActionListener, Runnable {
         }
     }
     
-
     void fill(int row, int col, int replace, int replaceWith) {
         // called by tearDown() to change "room codes".
         if (maze[row][col] == replace) {
@@ -237,7 +225,6 @@ public class Maze extends JPanel implements ActionListener, Runnable {
         }
     }
     
-
     boolean solveMaze(int row, int col) {
         // Try to solve the maze by continuing current path from position
         // (row,col). Return true if a solution is found. The maze is
