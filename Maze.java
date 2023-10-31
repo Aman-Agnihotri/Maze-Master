@@ -71,7 +71,7 @@ public class Maze extends JPanel implements ActionListener, Runnable {
         setBackground(color[backgroundCode]);
         setPreferredSize(new Dimension(blockSize * columns, blockSize * rows));
 
-        JButton startButton = new JButton("Start");
+        JButton startButton = new JButton("Generate Maze");
         startButton.addActionListener(this);
         add(startButton);
     }
