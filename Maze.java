@@ -74,6 +74,10 @@ public class Maze extends JPanel implements ActionListener, Runnable {
         JButton startButton = new JButton("Generate Maze");
         startButton.addActionListener(this);
         add(startButton);
+
+        JButton resetButton = new JButton("Reset");
+        resetButton.addActionListener(e -> resetMaze());
+        add(resetButton);
     }
 
     @Override
@@ -129,9 +133,20 @@ public class Maze extends JPanel implements ActionListener, Runnable {
     }
 
     public void run() {
-        
+        if (!isGenerating) {
+            isGenerating = true;
+            makeMaze();
+            solveMaze(1, 1);
+            isGenerating = false;
+        }
     }
     
+    private void resetMaze() {
+        // Reset the maze by clearing the maze data and repainting the panel.
+        maze = null;
+        mazeExists = false;
+        repaint();
+    }
     
 
     void makeMaze() {
