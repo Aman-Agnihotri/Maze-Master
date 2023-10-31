@@ -5,9 +5,7 @@ import java.awt.event.ActionListener;
 
 /**
  * Creates a random maze, then solves it by finding a path from the
- * upper left corner to the lower right corner. (After doing
- * one maze, it waits a while then starts over by creating a
- * new random maze.)
+ * upper left corner to the lower right corner.
  */
 public class Maze extends JPanel implements ActionListener {
 
@@ -23,8 +21,7 @@ public class Maze extends JPanel implements ActionListener {
 
     int[][] maze; // Description of state of maze. The value of maze[i][j]
                   // is one of the constants wallCode, pathcode, emptyCode,
-                  // or visitedCode. (Value can also be negative, temporarily,
-                  // inside createMaze().)
+                  // or visitedCode. (Value can also be negative, temporarily, inside createMaze().)
                   // A maze is made up of walls and corridors. maze[i][j]
                   // is either part of a wall or part of a corridor. A cell
                   // cell that is part of a corridor is represented by pathCode
@@ -56,7 +53,7 @@ public class Maze extends JPanel implements ActionListener {
 
     boolean mazeExists = false; // set to true when maze[][] is valid; used in
                                 // redrawMaze(); set to true in createMaze(), and
-                                // reset to false in run()
+                                // reset to false in resetMaze()
     private boolean isGenerating = false;
     private JButton resetButton;
     public Maze() {
