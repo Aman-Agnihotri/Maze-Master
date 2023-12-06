@@ -2,6 +2,7 @@ import java.awt.*;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.*;
 
 /**
  * Creates a random maze, then solves it by finding a path from the
@@ -21,7 +22,8 @@ public class Maze extends JPanel implements ActionListener {
 
     int[][] maze; // Description of state of maze. The value of maze[i][j]
                   // is one of the constants wallCode, pathcode, emptyCode,
-                  // or visitedCode. (Value can also be negative, temporarily, inside createMaze().)
+                  // or visitedCode. (Value can also be negative, temporarily, inside
+                  // createMaze().)
                   // A maze is made up of walls and corridors. maze[i][j]
                   // is either part of a wall or part of a corridor. A cell
                   // cell that is part of a corridor is represented by pathCode
@@ -56,6 +58,7 @@ public class Maze extends JPanel implements ActionListener {
                                 // reset to false in resetMaze()
     private boolean isGenerating = false;
     private JButton resetButton;
+
     public Maze() {
         color = new Color[] {
                 new Color(200, 0, 0),
@@ -87,6 +90,7 @@ public class Maze extends JPanel implements ActionListener {
         isGenerating = true;
         makeMaze();
         solveMaze(1, 1);
+        BFS(maze);
         isGenerating = false;
     }
 
@@ -103,7 +107,7 @@ public class Maze extends JPanel implements ActionListener {
             totalHeight = h * rows;
         }
     }
-    
+
     protected synchronized void paintComponent(Graphics g) {
         super.paintComponent(g);
         checkSize();
@@ -125,7 +129,7 @@ public class Maze extends JPanel implements ActionListener {
                 }
         }
     }
-    
+
     private void resetMaze() {
         if (!isGenerating) {
             // Reset the maze only if not generating the maze.
@@ -134,7 +138,7 @@ public class Maze extends JPanel implements ActionListener {
             repaint();
         }
     }
-    
+
     void makeMaze() {
         // Create a random maze. The strategy is to start with
         // a grid of disconnected "rooms" separated by walls.
@@ -209,7 +213,7 @@ public class Maze extends JPanel implements ActionListener {
             }
         }
     }
-    
+
     void fill(int row, int col, int replace, int replaceWith) {
         // called by tearDown() to change "room codes".
         if (maze[row][col] == replace) {
@@ -220,7 +224,7 @@ public class Maze extends JPanel implements ActionListener {
             fill(row, col - 1, replace, replaceWith);
         }
     }
-    
+
     boolean solveMaze(int row, int col) {
         // Try to solve the maze by continuing current path from position
         // (row,col). Return true if a solution is found. The maze is
@@ -252,4 +256,56 @@ public class Maze extends JPanel implements ActionListener {
         return false;
     }
 
+
+
+    static class Point {
+        int row, col;
+
+        Point(int row, int col) {
+            this.row = row;
+            this.col = col;
+        }
+    }
+
+    public static boolean BFS(int[][] maze) {
+        // Maze maze1=new Maze();
+        int numRows = maze.length;
+        int numCols = maze[0].length;
+        boolean[][] visited = new boolean[numRows][numCols];
+
+        Queue<Point> queue = new LinkedList<>();
+        queue.add(new Point(0, 0));
+        visited[0][0] = true;
+
+        int[][] directions = { { -1, 0 }, { 0, -1 }, { 0, 1 }, { 1, 0 } }; // Up, Left, Right, Down
+
+        while (!queue.isEmpty()) {
+            Point current = queue.poll();
+
+            for (int[] dir : directions) {
+                int newRow = current.row + dir[0];
+                int newCol = current.col + dir[1];
+
+                if (isValid(maze, newRow, newCol, visited)) {
+                    queue.add(new Point(newRow, newCol));
+                    visited[newRow][newCol] = true;
+                    repaint();
+                    // Mark the path (optional)
+                    maze[newRow][newCol] = 3; // You can change this value to any code you want for marking the path
+                }
+
+                if (newRow == numRows - 1 && newCol == numCols - 1) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean isValid(int[][] maze, int row, int col, boolean[][] visited) {
+        int numRows = maze.length;
+        int numCols = maze[0].length;
+        return (row >= 0 && row < numRows && col >= 0 && col < numCols && maze[row][col] == 2
+                && !visited[row][col]);
+    }
 }
