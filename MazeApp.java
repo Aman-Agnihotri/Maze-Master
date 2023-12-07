@@ -61,9 +61,13 @@ public class MazeApp extends JPanel implements ActionListener {
     static boolean mazeExists = false; // set to true when maze[][] is valid; used in redrawMaze().
 
     private boolean isGenerating = false;
+    private volatile boolean stopGeneration = false;
+
+    private Thread generationThread;
 
     MazePanel mazePanel;
 
+    private JButton resetButton;
     JComboBox<String> sizeDropdown;
 
     public MazeApp() {
@@ -91,7 +95,7 @@ public class MazeApp extends JPanel implements ActionListener {
         solveButton.addActionListener(this);
         controlPanel.add(solveButton);
 
-        JButton resetButton = new JButton("Reset");
+        resetButton = new JButton("Reset");
         resetButton.addActionListener(e -> resetMaze());
         controlPanel.add(resetButton);
 
@@ -188,8 +192,16 @@ public class MazeApp extends JPanel implements ActionListener {
     
     private void generateMaze() {
         isGenerating = true;
+
+        generationThread = Thread.currentThread(); // Store the reference to the generation thread
+        stopGeneration = false; // Reset the stop flag
+
+        resetButton.setText("Stop"); // Change the button text to "Stop"
+
         makeMaze();
         isGenerating = false;
+
+        resetButton.setText("Reset"); // Change the button text back to "Reset"
     }
     
     private void solveMaze() {
@@ -204,6 +216,23 @@ public class MazeApp extends JPanel implements ActionListener {
     public void startMazeSolving() {
         if (!isGenerating) {
             new Thread(this::solveMaze).start();
+        }
+    }
+
+    private void resetMaze() {
+        if (isGenerating) {
+            stopGeneration = true;  // Set the flag to stop maze generation
+            try {
+                generationThread.join();  // Wait for the generation thread to finish
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            stopGeneration = false;  // Reset the flag
+        } else {
+            // Reset the maze only if not generating the maze.
+            maze = null;
+            mazeExists = false;
+            repaint();
         }
     }
 
@@ -234,15 +263,6 @@ public class MazeApp extends JPanel implements ActionListener {
                         g.setColor(color[maze[i][j]]);
                     g.fillRect((j * w) + left, (i * h) + top, w, h);
                 }
-        }
-    }
-    
-    private void resetMaze() {
-        if (!isGenerating) {
-            // Reset the maze only if not generating the maze.
-            maze = null;
-            mazeExists = false;
-            repaint();
         }
     }
     
@@ -281,6 +301,10 @@ public class MazeApp extends JPanel implements ActionListener {
         repaint();
         int r;
         for (i = wallCt - 1; i > 0; i--) {
+            if (stopGeneration) {
+                return;  // Stop maze generation if the flag is set
+            }
+
             r = (int) (Math.random() * i); // choose a wall randomly and maybe tear it down
             tearDown(wallrow[r], wallcol[r]);
             wallrow[r] = wallrow[i];
