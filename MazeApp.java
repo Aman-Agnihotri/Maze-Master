@@ -23,7 +23,7 @@ public class MazeApp extends JPanel implements ActionListener {
     public static void main(String[] args) {
         JFrame window = new JFrame("Maze Master");
         window.setContentPane(new MazeApp());
-        window.setSize(900, 800);
+        window.setSize(1000, 800);
         window.setLocationRelativeTo(null);
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         window.setVisible(true);
@@ -262,8 +262,8 @@ public class MazeApp extends JPanel implements ActionListener {
             int h = (height - 2 * border) / rows;
             left = (width - w * columns) / 2;
             top = (height - h * rows) / 2;
-            totalWidth = w * columns;
-            totalHeight = h * rows;
+            totalWidth = w * columns - left;
+            totalHeight = h * rows - top;
         }
     }
 
