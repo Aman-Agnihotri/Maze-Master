@@ -20,7 +20,7 @@ public class MazeApp extends JPanel implements ActionListener {
     public static void main(String[] args) {
         JFrame window = new JFrame("Maze Master");
         window.setContentPane(new MazeApp());
-        window.setSize(1000, 1000);
+        window.setSize(800, 800);
         window.setLocationRelativeTo(null);
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         window.setVisible(true);
@@ -63,13 +63,14 @@ public class MazeApp extends JPanel implements ActionListener {
     private boolean isGenerating = false;
     private volatile boolean stopGeneration = false;
 
-    private Thread generationThread;
+    private transient Thread generationThread;
 
     MazePanel mazePanel;
 
     private JButton resetButton;
-    JComboBox<String> sizeDropdown;
     private JSlider speedSlider;
+    private JTextField rowsField;
+    private JTextField columnsField;
 
     public MazeApp() {
         color = new Color[] {
@@ -108,10 +109,16 @@ public class MazeApp extends JPanel implements ActionListener {
         loadButton.addActionListener(this);
         controlPanel.add(loadButton);
 
-        String[] sizeOptions = {"Medium", "Small", "Large"};
-        sizeDropdown = new JComboBox<>(sizeOptions);
-        sizeDropdown.addActionListener(this);
-        controlPanel.add(sizeDropdown);
+        rowsField = new JTextField("41", 5); // Default value: 41
+        columnsField = new JTextField("51", 5); // Default value: 51
+
+        JPanel sizePanel = new JPanel();
+        sizePanel.add(new JLabel("Rows:"));
+        sizePanel.add(rowsField);
+        sizePanel.add(new JLabel("Columns:"));
+        sizePanel.add(columnsField);
+
+        controlPanel.add(sizePanel);
 
         add(controlPanel, BorderLayout.NORTH);
 
@@ -127,34 +134,6 @@ public class MazeApp extends JPanel implements ActionListener {
         speedPanel.add(speedSlider);
 
         add(speedPanel, BorderLayout.WEST);
-    }
-
-    private void adjustMazeSize(String sizeOption) {
-        int rows, columns;
-
-        switch (sizeOption) {
-            case "Small":
-                rows = 21;
-                columns = 31;
-                break;
-            case "Large":
-                rows = 61;
-                columns = 71;
-                break;
-            default:
-                rows = 41;  // Default to Medium size
-                columns = 51;
-                break;
-        }
-
-        mazePanel.setPreferredSize(new Dimension(blockSize * columns, blockSize * rows));
-        mazePanel.revalidate();
-        mazePanel.repaint();
-
-        MazeApp.rows = rows;
-        MazeApp.columns = columns;
-        MazeApp.mazeExists = false;
-        repaint();
     }
 
     private static final String SAVE_FILE_NAME = "mazeSave.ser";
@@ -198,23 +177,18 @@ public class MazeApp extends JPanel implements ActionListener {
             saveMazeState();
         } else if (e.getActionCommand().equals("Load Maze")) {
             loadMazeState();
-        } else if (e.getSource() == sizeDropdown) {
-            String selectedSize = (String) sizeDropdown.getSelectedItem();
-            adjustMazeSize(selectedSize);
         }
     }
     
     private void generateMaze() {
         isGenerating = true;
-
         generationThread = Thread.currentThread(); // Store the reference to the generation thread
+
         stopGeneration = false; // Reset the stop flag
-
         resetButton.setText("Stop"); // Change the button text to "Stop"
-
+        
         makeMaze();
         isGenerating = false;
-
         resetButton.setText("Reset"); // Change the button text back to "Reset"
     }
     
@@ -286,7 +260,12 @@ public class MazeApp extends JPanel implements ActionListener {
         // then look at each of the separating walls, in a random
         // order. If tearing down a wall would not create a loop
         // in the maze, then tear it down. Otherwise, leave it in place.
-        if (maze == null)
+
+        // Use user-inputted values for rows and columns
+        rows = Integer.parseInt(rowsField.getText());
+        columns = Integer.parseInt(columnsField.getText());
+
+        if (maze == null || maze.length != rows || maze[0].length != columns)
             maze = new int[rows][columns];
         int i, j;
         int emptyCt = 0; // number of rooms
