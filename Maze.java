@@ -15,7 +15,7 @@ public class Maze extends JPanel implements ActionListener {
     public static void main(String[] args) {
         JFrame window = new JFrame("Maze Master");
         window.setContentPane(new Maze());
-        window.pack();
+        window.setSize(1000, 1000);
         window.setLocation(120, 80);
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         window.setVisible(true);
@@ -42,7 +42,6 @@ public class Maze extends JPanel implements ActionListener {
     int rows = 41; // number of rows of cells in maze, including a wall around edges
     int columns = 51; // number of columns of cells in maze, including a wall around edges
     int border = 0; // minimum number of pixels between maze and edge of panel
-    int sleepTime = 5000; // wait time after solving one maze before making another
     int speedSleep = 30; // short delay between steps in making and solving maze
     int blockSize = 12; // size of each cell
 
@@ -58,7 +57,9 @@ public class Maze extends JPanel implements ActionListener {
                                 // redrawMaze(); set to true in createMaze(), and
                                 // reset to false in run()
     private boolean isGenerating = false;
-    private JButton resetButton;
+
+    MazeLogic mazePanel;
+
     public Maze() {
         color = new Color[] {
                 new Color(200, 0, 0),
@@ -67,21 +68,40 @@ public class Maze extends JPanel implements ActionListener {
                 Color.WHITE,
                 new Color(200, 200, 200)
         };
-        setBackground(color[backgroundCode]);
-        setPreferredSize(new Dimension(blockSize * columns, blockSize * rows));
+        setLayout(new BorderLayout());
 
+        mazePanel = new MazeLogic(this);
+        add(mazePanel, BorderLayout.CENTER);
+
+        JPanel controlPanel = new JPanel();
+        controlPanel.setLayout(new BoxLayout(controlPanel, BoxLayout.X_AXIS));
 
         JButton generateButton = new JButton("Generate Maze");
         generateButton.addActionListener(this);
-        add(generateButton);
+        controlPanel.add(generateButton);
 
         JButton solveButton = new JButton("Solve Maze");
         solveButton.addActionListener(this);
-        add(solveButton);
+        controlPanel.add(solveButton);
 
-        resetButton = new JButton("Reset");
+        JButton resetButton = new JButton("Reset");
         resetButton.addActionListener(e -> resetMaze());
-        add(resetButton);
+        controlPanel.add(resetButton);
+
+        // String[] sizeOptions = {"Small", "Medium", "Large"};
+        // JComboBox<String> sizeDropdown = new JComboBox<>(sizeOptions);
+        // sizeDropdown.addActionListener(this);
+        // controlPanel.add(sizeDropdown);
+
+        // JButton saveButton = new JButton("Save Maze");
+        // saveButton.addActionListener(this);
+        // controlPanel.add(saveButton);
+
+        // JButton loadButton = new JButton("Load Maze");
+        // loadButton.addActionListener(this);
+        // controlPanel.add(loadButton);
+
+        add(controlPanel, BorderLayout.NORTH);
     }
     
     @Override
