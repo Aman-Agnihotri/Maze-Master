@@ -70,27 +70,42 @@ public class Maze extends JPanel implements ActionListener {
         setBackground(color[backgroundCode]);
         setPreferredSize(new Dimension(blockSize * columns, blockSize * rows));
 
-        JButton startButton = new JButton("Generate Maze");
-        startButton.addActionListener(this);
-        add(startButton);
+
+        JButton generateButton = new JButton("Generate Maze");
+        generateButton.addActionListener(this);
+        add(generateButton);
+
+        JButton solveButton = new JButton("Solve Maze");
+        solveButton.addActionListener(this);
+        add(solveButton);
 
         resetButton = new JButton("Reset");
         resetButton.addActionListener(e -> resetMaze());
         add(resetButton);
     }
-
+    
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (!isGenerating) {
-            new Thread(this::generateAndSolveMaze).start();
+        if (e.getActionCommand().equals("Generate Maze")) {
+            startMazeGeneration();
+        } else if (e.getActionCommand().equals("Solve Maze")) {
+            startMazeSolving();
         }
     }
-
-    private void generateAndSolveMaze() {
-        isGenerating = true;
-        makeMaze();
+    
+    private void solveMaze() {
         solveMaze(1, 1);
-        isGenerating = false;
+    }
+
+    public void startMazeGeneration() {
+        if (!isGenerating) {
+            new Thread(this::makeMaze).start();
+        }
+    }
+    public void startMazeSolving() {
+        if (!isGenerating) {
+            new Thread(this::solveMaze).start();
+        }
     }
 
     void checkSize() {
