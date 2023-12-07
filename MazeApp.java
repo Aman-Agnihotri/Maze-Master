@@ -1,7 +1,10 @@
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -20,7 +23,7 @@ public class MazeApp extends JPanel implements ActionListener {
     public static void main(String[] args) {
         JFrame window = new JFrame("Maze Master");
         window.setContentPane(new MazeApp());
-        window.setSize(800, 800);
+        window.setSize(900, 800);
         window.setLocationRelativeTo(null);
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         window.setVisible(true);
@@ -68,6 +71,7 @@ public class MazeApp extends JPanel implements ActionListener {
     MazePanel mazePanel;
 
     private JButton resetButton;
+    private JButton exportButton;
     private JSlider speedSlider;
     private JTextField rowsField;
     private JTextField columnsField;
@@ -108,6 +112,10 @@ public class MazeApp extends JPanel implements ActionListener {
         JButton loadButton = new JButton("Load Maze");
         loadButton.addActionListener(this);
         controlPanel.add(loadButton);
+
+        exportButton = new JButton("Export Maze");
+        exportButton.addActionListener(e -> exportMaze());
+        controlPanel.add(exportButton);
 
         rowsField = new JTextField("41", 5); // Default value: 41
         columnsField = new JTextField("51", 5); // Default value: 51
@@ -162,6 +170,25 @@ public class MazeApp extends JPanel implements ActionListener {
         }
     }
 
+    private void exportMaze() {
+        int mazeWidth = totalWidth;
+        int mazeHeight = totalHeight;
+        BufferedImage image = new BufferedImage(mazeWidth, mazeHeight, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = image.createGraphics();
+
+        mazePanel.paint(g); // Paint only the maze panel
+
+        g.dispose();
+
+        try {
+            File file = new File("maze.png");
+            ImageIO.write(image, "png", file);
+            JOptionPane.showMessageDialog(this, "Maze exported as maze.png");
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error exporting maze", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
     
     @Override
     public void actionPerformed(ActionEvent e) {
