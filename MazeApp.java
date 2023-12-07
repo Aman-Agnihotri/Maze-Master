@@ -9,14 +9,14 @@ import java.awt.event.ActionListener;
  * one maze, it waits a while then starts over by creating a
  * new random maze.)
  */
-public class Maze extends JPanel implements ActionListener {
+public class MazeApp extends JPanel implements ActionListener {
 
     // a main routine makes it possible to run this class as a program
     public static void main(String[] args) {
         JFrame window = new JFrame("Maze Master");
-        window.setContentPane(new Maze());
-        window.pack();
-        window.setLocation(120, 80);
+        window.setContentPane(new MazeApp());
+        window.setSize(800, 800);
+        window.setLocationRelativeTo(null);
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         window.setVisible(true);
     }
@@ -58,8 +58,10 @@ public class Maze extends JPanel implements ActionListener {
                                 // redrawMaze(); set to true in createMaze(), and
                                 // reset to false in run()
     private boolean isGenerating = false;
-    private JButton resetButton;
-    public Maze() {
+
+    MazeLogic mazePanel;
+
+    public MazeApp() {
         color = new Color[] {
                 new Color(200, 0, 0),
                 new Color(200, 0, 0),
@@ -67,21 +69,28 @@ public class Maze extends JPanel implements ActionListener {
                 Color.WHITE,
                 new Color(200, 200, 200)
         };
-        setBackground(color[backgroundCode]);
-        setPreferredSize(new Dimension(blockSize * columns, blockSize * rows));
 
+        setLayout(new BorderLayout());
+
+        mazePanel = new MazeLogic(this);
+        add(mazePanel, BorderLayout.CENTER);
+
+        JPanel controlPanel = new JPanel();
+        controlPanel.setLayout(new BoxLayout(controlPanel, BoxLayout.X_AXIS));
 
         JButton generateButton = new JButton("Generate Maze");
         generateButton.addActionListener(this);
-        add(generateButton);
+        controlPanel.add(generateButton);
 
         JButton solveButton = new JButton("Solve Maze");
         solveButton.addActionListener(this);
-        add(solveButton);
+        controlPanel.add(solveButton);
 
-        resetButton = new JButton("Reset");
+        JButton resetButton = new JButton("Reset");
         resetButton.addActionListener(e -> resetMaze());
-        add(resetButton);
+        controlPanel.add(resetButton);
+
+        add(controlPanel, BorderLayout.NORTH);
     }
     
     @Override
