@@ -20,7 +20,7 @@ public class MazeApp extends JPanel implements ActionListener {
     public static void main(String[] args) {
         JFrame window = new JFrame("Maze Master");
         window.setContentPane(new MazeApp());
-        window.setSize(800, 800);
+        window.setSize(1000, 1000);
         window.setLocationRelativeTo(null);
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         window.setVisible(true);
@@ -69,6 +69,7 @@ public class MazeApp extends JPanel implements ActionListener {
 
     private JButton resetButton;
     JComboBox<String> sizeDropdown;
+    private JSlider speedSlider;
 
     public MazeApp() {
         color = new Color[] {
@@ -113,6 +114,19 @@ public class MazeApp extends JPanel implements ActionListener {
         controlPanel.add(sizeDropdown);
 
         add(controlPanel, BorderLayout.NORTH);
+
+        speedSlider = new JSlider(JSlider.VERTICAL, 1, 100, speedSleep);
+        speedSlider.setMajorTickSpacing(5);
+        speedSlider.setPaintTicks(true);
+        speedSlider.addChangeListener(e -> {
+            speedSleep = speedSlider.getValue();
+        });
+
+        JPanel speedPanel = new JPanel(new BorderLayout());
+        speedPanel.add(new JLabel("Speed:"), BorderLayout.NORTH);
+        speedPanel.add(speedSlider);
+
+        add(speedPanel, BorderLayout.WEST);
     }
 
     private void adjustMazeSize(String sizeOption) {
