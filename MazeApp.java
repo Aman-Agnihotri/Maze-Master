@@ -171,22 +171,24 @@ public class MazeApp extends JPanel implements ActionListener {
     }
 
     private void exportMaze() {
-        int mazeWidth = totalWidth;
-        int mazeHeight = totalHeight;
-        BufferedImage image = new BufferedImage(mazeWidth, mazeHeight, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = image.createGraphics();
+        if (!isGenerating) {
+            int mazeWidth = totalWidth;
+            int mazeHeight = totalHeight;
+            BufferedImage image = new BufferedImage(mazeWidth, mazeHeight, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = image.createGraphics();
 
-        mazePanel.paint(g); // Paint only the maze panel
+            mazePanel.paint(g); // Paint only the maze panel
 
-        g.dispose();
+            g.dispose();
 
-        try {
-            File file = new File("maze.png");
-            ImageIO.write(image, "png", file);
-            JOptionPane.showMessageDialog(this, "Maze exported as maze.png");
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error exporting maze", "Error", JOptionPane.ERROR_MESSAGE);
+            try {
+                File file = new File("maze.png");
+                ImageIO.write(image, "png", file);
+                JOptionPane.showMessageDialog(this, "Maze exported as maze.png");
+            } catch (IOException ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Error exporting maze", "Error", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
     
