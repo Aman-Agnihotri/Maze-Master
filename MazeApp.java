@@ -39,10 +39,9 @@ public class MazeApp extends JPanel implements ActionListener {
     static final int visitedCode = 4;
 
     Color[] color; // colors associated with the preceding 5 constants
-    int rows = 41; // number of rows of cells in maze, including a wall around edges
-    int columns = 51; // number of columns of cells in maze, including a wall around edges
+    static int rows = 41; // number of rows of cells in maze, including a wall around edges
+    static int columns = 51; // number of columns of cells in maze, including a wall around edges
     int border = 0; // minimum number of pixels between maze and edge of panel
-    int sleepTime = 5000; // wait time after solving one maze before making another
     int speedSleep = 30; // short delay between steps in making and solving maze
     int blockSize = 12; // size of each cell
 
@@ -54,12 +53,13 @@ public class MazeApp extends JPanel implements ActionListener {
     int left; // left edge of maze, allowing for border (set in checkSize())
     int top; // top edge of maze, allowing for border (set in checkSize())
 
-    boolean mazeExists = false; // set to true when maze[][] is valid; used in
-                                // redrawMaze(); set to true in createMaze(), and
-                                // reset to false in run()
+    static boolean mazeExists = false; // set to true when maze[][] is valid; used in redrawMaze().
+
     private boolean isGenerating = false;
 
-    MazeLogic mazePanel;
+    MazePanel mazePanel;
+
+    JComboBox<String> sizeDropdown;
 
     public MazeApp() {
         color = new Color[] {
@@ -72,7 +72,7 @@ public class MazeApp extends JPanel implements ActionListener {
 
         setLayout(new BorderLayout());
 
-        mazePanel = new MazeLogic(this);
+        mazePanel = new MazePanel(this);
         add(mazePanel, BorderLayout.CENTER);
 
         JPanel controlPanel = new JPanel();
@@ -90,8 +90,50 @@ public class MazeApp extends JPanel implements ActionListener {
         resetButton.addActionListener(e -> resetMaze());
         controlPanel.add(resetButton);
 
+        JButton saveButton = new JButton("Save Maze");
+        saveButton.addActionListener(this);
+        controlPanel.add(saveButton);
+
+        JButton loadButton = new JButton("Load Maze");
+        loadButton.addActionListener(this);
+        controlPanel.add(loadButton);
+
+        String[] sizeOptions = {"Medium", "Small", "Large"};
+        sizeDropdown = new JComboBox<>(sizeOptions);
+        sizeDropdown.addActionListener(this);
+        controlPanel.add(sizeDropdown);
+
         add(controlPanel, BorderLayout.NORTH);
     }
+
+    private void adjustMazeSize(String sizeOption) {
+        int rows, columns;
+
+        switch (sizeOption) {
+            case "Small":
+                rows = 21;
+                columns = 31;
+                break;
+            case "Large":
+                rows = 61;
+                columns = 71;
+                break;
+            default:
+                rows = 41;  // Default to Medium size
+                columns = 51;
+                break;
+        }
+
+        mazePanel.setPreferredSize(new Dimension(blockSize * columns, blockSize * rows));
+        mazePanel.revalidate();
+        mazePanel.repaint();
+
+        MazeApp.rows = rows;
+        MazeApp.columns = columns;
+        MazeApp.mazeExists = false;
+        repaint();
+    }
+
     
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -99,6 +141,9 @@ public class MazeApp extends JPanel implements ActionListener {
             startMazeGeneration();
         } else if (e.getActionCommand().equals("Solve Maze")) {
             startMazeSolving();
+        } else if (e.getSource() == sizeDropdown) {
+            String selectedSize = (String) sizeDropdown.getSelectedItem();
+            adjustMazeSize(selectedSize);
         }
     }
     
@@ -129,12 +174,6 @@ public class MazeApp extends JPanel implements ActionListener {
             totalWidth = w * columns;
             totalHeight = h * rows;
         }
-    }
-    
-    protected synchronized void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        checkSize();
-        redrawMaze(g);
     }
 
     void redrawMaze(Graphics g) {

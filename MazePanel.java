@@ -1,15 +1,15 @@
 import javax.swing.*;
 import java.awt.*;
 
-public class MazeLogic extends JPanel {
+public class MazePanel extends JPanel {
 
     private MazeApp maze;
 
-    public MazeLogic(MazeApp maze) {
+    public MazePanel(MazeApp maze) {
         this.maze = maze;
-        setBackground(maze.color[MazeApp.backgroundCode]);
 
-        setPreferredSize(new Dimension(maze.blockSize * maze.columns, maze.blockSize * maze.rows));
+        setBackground(maze.color[MazeApp.backgroundCode]);
+        setPreferredSize(new Dimension(maze.blockSize * MazeApp.columns, maze.blockSize * MazeApp.rows));
         
     }
 
