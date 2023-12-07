@@ -2,6 +2,11 @@ import java.awt.*;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 /**
  * Creates a random maze, then solves it by finding a path from the
@@ -134,17 +139,57 @@ public class MazeApp extends JPanel implements ActionListener {
         repaint();
     }
 
+    private static final String SAVE_FILE_NAME = "mazeSave.ser";
+
+    public void saveMazeState() {
+        try (ObjectOutputStream outputStream = new ObjectOutputStream(new FileOutputStream(SAVE_FILE_NAME))) {
+            outputStream.writeObject(this);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void loadMazeState() {
+        try (ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream(SAVE_FILE_NAME))) {
+            MazeApp loadedMaze = (MazeApp) inputStream.readObject();
+            this.maze = loadedMaze.maze;
+            this.rows = loadedMaze.rows;
+            this.columns = loadedMaze.columns;
+            this.mazeExists = true;
+            this.repaint();
+            mazePanel.setPreferredSize(new Dimension(blockSize * columns, blockSize * rows));
+            mazePanel.revalidate();
+            mazePanel.repaint();
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
     
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (isGenerating) {
+            return;  // Do nothing if maze generation is in progress
+        }
+
         if (e.getActionCommand().equals("Generate Maze")) {
             startMazeGeneration();
         } else if (e.getActionCommand().equals("Solve Maze")) {
             startMazeSolving();
+        } else if (e.getActionCommand().equals("Save Maze")) {
+            saveMazeState();
+        } else if (e.getActionCommand().equals("Load Maze")) {
+            loadMazeState();
         } else if (e.getSource() == sizeDropdown) {
             String selectedSize = (String) sizeDropdown.getSelectedItem();
             adjustMazeSize(selectedSize);
         }
+    }
+    
+    private void generateMaze() {
+        isGenerating = true;
+        makeMaze();
+        isGenerating = false;
     }
     
     private void solveMaze() {
@@ -153,7 +198,7 @@ public class MazeApp extends JPanel implements ActionListener {
 
     public void startMazeGeneration() {
         if (!isGenerating) {
-            new Thread(this::makeMaze).start();
+            new Thread(this::generateMaze).start();
         }
     }
     public void startMazeSolving() {
