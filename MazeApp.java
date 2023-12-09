@@ -216,13 +216,13 @@ public class MazeApp extends JPanel implements ActionListener {
         stopGeneration = false; // Reset the stop flag
         resetButton.setText("Stop"); // Change the button text to "Stop"
         
-        makeMaze();
+        makeMazeDFS();
         isGenerating = false;
         resetButton.setText("Reset"); // Change the button text back to "Reset"
     }
     
     private void solveMaze() {
-        solveMaze(1, 1);
+        solveMazeDFS(1, 1);
     }
 
     public void startMazeGeneration() {
@@ -283,7 +283,7 @@ public class MazeApp extends JPanel implements ActionListener {
         }
     }
     
-    void makeMaze() {
+    void makeMazeDFS() {
         // Create a random maze. The strategy is to start with
         // a grid of disconnected "rooms" separated by walls.
         // then look at each of the separating walls, in a random
@@ -378,7 +378,7 @@ public class MazeApp extends JPanel implements ActionListener {
         }
     }
     
-    boolean solveMaze(int row, int col) {
+    boolean solveMazeDFS(int row, int col) {
         // Try to solve the maze by continuing current path from position
         // (row,col). Return true if a solution is found. The maze is
         // considered to be solved if the path reaches the lower right cell.
@@ -391,10 +391,10 @@ public class MazeApp extends JPanel implements ActionListener {
                 Thread.sleep(speedSleep);
             } catch (InterruptedException e) {
             }
-            if (solveMaze(row - 1, col) || // try to solve maze by extending path
-                    solveMaze(row, col - 1) || // in each possible direction
-                    solveMaze(row + 1, col) ||
-                    solveMaze(row, col + 1))
+            if (solveMazeDFS(row - 1, col) || // try to solve maze by extending path
+                    solveMazeDFS(row, col - 1) || // in each possible direction
+                    solveMazeDFS(row + 1, col) ||
+                    solveMazeDFS(row, col + 1))
                 return true;
             // maze can't be solved from this cell, so backtrack out of the cell
             maze[row][col] = visitedCode; // mark cell as having been visited
