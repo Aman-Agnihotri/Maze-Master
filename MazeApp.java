@@ -10,6 +10,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.*;
+import java.util.Queue;
 
 /**
  * Creates a random maze, then solves it by finding a path from the
@@ -82,7 +84,8 @@ public class MazeApp extends JPanel implements ActionListener {
                 new Color(200, 0, 0),
                 new Color(128, 128, 255),
                 Color.WHITE,
-                new Color(200, 200, 200)
+                new Color(200, 200, 200),
+                Color.GREEN
         };
 
         setLayout(new BorderLayout());
@@ -222,7 +225,7 @@ public class MazeApp extends JPanel implements ActionListener {
     }
     
     private void solveMaze() {
-        solveMazeDFS(1, 1);
+        solveMazeBFS(1,1);
     }
 
     public void startMazeGeneration() {
@@ -407,6 +410,79 @@ public class MazeApp extends JPanel implements ActionListener {
             }
         }
         return false;
+    }
+
+    private final int[] deltaRow = { -1, 0, 1, 0 };
+    private final int[] deltaCol = { 0, -1, 0, 1 };
+
+    static final int startCode = 5; // Code for the start cell
+    static final int endCode = 6;   // Code for the end cell
+    static final int pathRetracedCode = 5;
+    Point[][] parent; // To store parent information for backtracking
+
+    boolean solveMazeBFS(int startRow, int startCol) {
+        Queue<Point> queue = new LinkedList<>();
+        parent = new Point[rows][columns]; // Initialize parent array
+        queue.add(new Point(startRow, startCol)); // Start from the entrance
+        maze[startRow][startCol] = pathCode; // Mark the starting point as part of the path
+
+        while (!queue.isEmpty()) {
+            Point current = queue.poll();
+
+            int row = current.x;
+            int col = current.y;
+
+            // If the exit is reached, return true
+            if (row == rows - 2 && col == columns - 2) {
+                repaint();
+                showShortestPath();
+                return true;
+            }
+
+            // Try to move in each direction
+            for (int i = 0; i < 4; i++) {
+                int newRow = row + deltaRow[i];
+                int newCol = col + deltaCol[i];
+
+                // If the new cell is a valid path cell, mark it, add to the queue, and set parent information
+                if (maze[newRow][newCol] == emptyCode) {
+                    maze[newRow][newCol] = pathCode;
+                    repaint();
+                    queue.add(new Point(newRow, newCol));
+                    parent[newRow][newCol] = new Point(row, col); // Save parent information
+
+                    try {
+                        Thread.sleep(speedSleep);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        return false; // No solution found
+    }
+    
+    void showShortestPath() {
+        int row = rows - 2;
+        int col = columns - 2;
+
+        while (parent[row][col] != null) {
+            Point current = parent[row][col];
+            row = current.x;
+            col = current.y;
+
+            if (maze[row][col] != startCode && maze[row][col] != endCode) {
+                maze[row][col] = pathRetracedCode; // Mark the path in green
+                repaint();
+
+                try {
+                    Thread.sleep(speedSleep);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
 }
