@@ -348,6 +348,11 @@ public class MazeApp extends JPanel implements ActionListener {
         rows = Integer.parseInt(rowsField.getText());
         columns = Integer.parseInt(columnsField.getText());
 
+        if(rows % 2 == 0){
+            rows++;
+            columns++;
+        }
+
         if (maze == null || maze.length != rows || maze[0].length != columns)
             maze = new int[rows][columns];
         int i, j;
