@@ -25,7 +25,7 @@ public class MazeApp extends JPanel implements ActionListener {
     public static void main(String[] args) {
         JFrame window = new JFrame("Maze Master");
         window.setContentPane(new MazeApp());
-        window.setSize(1000, 800);
+        window.setSize(1100, 900);
         window.setLocationRelativeTo(null);
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         window.setVisible(true);
@@ -66,17 +66,23 @@ public class MazeApp extends JPanel implements ActionListener {
     static boolean mazeExists = false; // set to true when maze[][] is valid; used in redrawMaze().
 
     private boolean isGenerating = false;
+    boolean isSolving = false;
     private volatile boolean stopGeneration = false;
+    private volatile boolean stopSolving = false;
 
     private transient Thread generationThread;
 
     MazePanel mazePanel;
 
+    JButton solveButton;
     private JButton resetButton;
     private JButton exportButton;
     private JSlider speedSlider;
     private JTextField rowsField;
     private JTextField columnsField;
+    private JComboBox<String> algorithmComboBox;
+    private JPanel sidePanel;
+    String algorithmSelected = "";
 
     public MazeApp() {
         color = new Color[] {
@@ -100,7 +106,7 @@ public class MazeApp extends JPanel implements ActionListener {
         generateButton.addActionListener(this);
         controlPanel.add(generateButton);
 
-        JButton solveButton = new JButton("Solve Maze");
+        solveButton = new JButton("Solve Maze");
         solveButton.addActionListener(this);
         controlPanel.add(solveButton);
 
@@ -119,6 +125,13 @@ public class MazeApp extends JPanel implements ActionListener {
         exportButton = new JButton("Export Maze");
         exportButton.addActionListener(e -> exportMaze());
         controlPanel.add(exportButton);
+
+        // Initialize the JComboBox for algorithm selection
+        String[] algorithms = {"Depth First Search", "Breadth First Search", "A*"};
+        algorithmComboBox = new JComboBox<>(algorithms);
+        algorithmComboBox.addActionListener(this);
+
+        controlPanel.add(algorithmComboBox, BorderLayout.EAST);
 
         rowsField = new JTextField("41", 5); // Default value: 41
         columnsField = new JTextField("51", 5); // Default value: 51
@@ -201,6 +214,12 @@ public class MazeApp extends JPanel implements ActionListener {
             return;  // Do nothing if maze generation is in progress
         }
 
+        // Check which button was clicked
+        if (e.getSource() == solveButton) {
+            // Get the selected algorithm from the JComboBox
+            algorithmSelected = (String) algorithmComboBox.getSelectedItem();
+        }
+
         if (e.getActionCommand().equals("Generate Maze")) {
             startMazeGeneration();
         } else if (e.getActionCommand().equals("Solve Maze")) {
@@ -225,7 +244,16 @@ public class MazeApp extends JPanel implements ActionListener {
     }
     
     private void solveMaze() {
-        solveMazeBFS(1,1);
+
+        switch (algorithmSelected) {
+            case "Depth First Search" -> solveMazeDFS(1,1);
+
+            case "Breadth First Search" -> solveMazeBFS(1, 1);
+        
+            case "A*" -> solveMazeAStar(1, 1);
+
+            default -> solveMazeDFS(1, 1);
+        }
     }
 
     public void startMazeGeneration() {
@@ -389,23 +417,28 @@ public class MazeApp extends JPanel implements ActionListener {
             maze[row][col] = pathCode; // add this cell to the path
             repaint();
             if (row == rows - 2 && col == columns - 2)
-                return true; // path has reached goal
+                return true; // path has reached the goal
+            
             try {
                 Thread.sleep(speedSleep);
             } catch (InterruptedException e) {
+                e.printStackTrace();
             }
             if (solveMazeDFS(row - 1, col) || // try to solve maze by extending path
-                    solveMazeDFS(row, col - 1) || // in each possible direction
-                    solveMazeDFS(row + 1, col) ||
-                    solveMazeDFS(row, col + 1))
+                solveMazeDFS(row, col - 1) || // in each possible direction
+                solveMazeDFS(row + 1, col) ||
+                solveMazeDFS(row, col + 1))
                 return true;
+
             // maze can't be solved from this cell, so backtrack out of the cell
             maze[row][col] = visitedCode; // mark cell as having been visited
             repaint();
+
             synchronized (this) {
                 try {
                     wait(speedSleep);
                 } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
             }
         }
@@ -418,11 +451,10 @@ public class MazeApp extends JPanel implements ActionListener {
     static final int startCode = 5; // Code for the start cell
     static final int endCode = 6;   // Code for the end cell
     static final int pathRetracedCode = 5;
-    Point[][] parent; // To store parent information for backtracking
+    Point[][] parent = new Point[rows][columns]; // To store parent information for backtracking
 
     boolean solveMazeBFS(int startRow, int startCol) {
         Queue<Point> queue = new LinkedList<>();
-        parent = new Point[rows][columns]; // Initialize parent array
         queue.add(new Point(startRow, startCol)); // Start from the entrance
         maze[startRow][startCol] = pathCode; // Mark the starting point as part of the path
 
@@ -483,6 +515,63 @@ public class MazeApp extends JPanel implements ActionListener {
                 }
             }
         }
+    }
+
+    boolean solveMazeAStar(int startRow, int startCol) {
+        PriorityQueue<Point> priorityQueue = new PriorityQueue<>(Comparator.comparingDouble(this::calculateTotalCost));
+        priorityQueue.add(new Point(startRow, startCol)); // Start from the entrance
+        maze[startRow][startCol] = pathCode; // Mark the starting point as part of the path
+
+        while (!priorityQueue.isEmpty()) {
+            Point current = priorityQueue.poll();
+            int row = current.x;
+            int col = current.y;
+
+            // If the exit is reached, backtrack to find the shortest path
+            if (row == rows - 2 && col == columns - 2) {
+                repaint();
+                showShortestPath();
+                return true;
+            }
+
+            // Try to move in each direction
+            for (int i = 0; i < 4; i++) {
+                int newRow = row + deltaRow[i];
+                int newCol = col + deltaCol[i];
+
+                // If the new cell is a valid path cell, mark it, add to the priority queue, and set parent information
+                if (maze[newRow][newCol] == emptyCode) {
+                    maze[newRow][newCol] = pathCode;
+                    repaint();
+                    priorityQueue.add(new Point(newRow, newCol));
+                    parent[newRow][newCol] = new Point(row, col); // Save parent information
+
+                    try {
+                        Thread.sleep(speedSleep);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        return false; // No solution found
+    }
+
+    private double calculateTotalCost(Point point) {
+        int row = point.x;
+        int col = point.y;
+        return calculateCostFromStart(row, col) + calculateHeuristic(row, col);
+    }
+
+    private double calculateCostFromStart(int row, int col) {
+        // Calculate the cost from the start to the current cell
+        return parent[row][col] == null ? 0 : calculateCostFromStart(parent[row][col].x, parent[row][col].y) + 1;
+    }
+
+    private double calculateHeuristic(int row, int col) {
+        // Calculate the heuristic estimate from the current cell to the destination
+        return Math.abs(row - (rows - 2)) + Math.abs(col - (columns - 2));
     }
 
 }
