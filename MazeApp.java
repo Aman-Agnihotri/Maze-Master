@@ -66,11 +66,12 @@ public class MazeApp extends JPanel implements ActionListener {
     static boolean mazeExists = false; // set to true when maze[][] is valid; used in redrawMaze().
 
     private boolean isGenerating = false;
-    boolean isSolving = false;
+    private boolean isSolving = false;
     private volatile boolean stopGeneration = false;
     private volatile boolean stopSolving = false;
 
     private transient Thread generationThread;
+    private transient Thread solvingThread;
 
     MazePanel mazePanel;
 
@@ -81,7 +82,6 @@ public class MazeApp extends JPanel implements ActionListener {
     private JTextField rowsField;
     private JTextField columnsField;
     private JComboBox<String> algorithmComboBox;
-    private JPanel sidePanel;
     String algorithmSelected = "";
 
     public MazeApp() {
@@ -214,6 +214,10 @@ public class MazeApp extends JPanel implements ActionListener {
             return;  // Do nothing if maze generation is in progress
         }
 
+        if (isSolving) {
+            return; // Do nothing if maze solving is in progress
+        }
+
         // Check which button was clicked
         if (e.getSource() == solveButton) {
             // Get the selected algorithm from the JComboBox
@@ -244,6 +248,11 @@ public class MazeApp extends JPanel implements ActionListener {
     }
     
     private void solveMaze() {
+        isSolving = true;
+        solvingThread = Thread.currentThread(); // Store the reference to the solving thread
+
+        stopSolving = false; // Reset the stop flag
+        resetButton.setText("Stop"); // Change the button text to "Stop"
 
         switch (algorithmSelected) {
             case "Depth First Search" -> solveMazeDFS(1,1);
@@ -254,6 +263,9 @@ public class MazeApp extends JPanel implements ActionListener {
 
             default -> solveMazeDFS(1, 1);
         }
+        isSolving = false;
+        resetButton.setText("Reset"); // Change the button text back to "Reset"
+
     }
 
     public void startMazeGeneration() {
@@ -276,8 +288,19 @@ public class MazeApp extends JPanel implements ActionListener {
                 e.printStackTrace();
             }
             stopGeneration = false;  // Reset the flag
-        } else {
-            // Reset the maze only if not generating the maze.
+
+        } else if (isSolving) {
+            stopSolving = true; // Set the flag to stop maze solving
+            try {
+                solvingThread.join();  // Wait for the solving thread to finish
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            stopSolving = false; // Reset the flag
+        }
+        
+        else {
+            // Reset the maze only if not generating or solving the maze.
             maze = null;
             mazeExists = false;
             repaint();
@@ -413,12 +436,19 @@ public class MazeApp extends JPanel implements ActionListener {
         // Try to solve the maze by continuing current path from position
         // (row,col). Return true if a solution is found. The maze is
         // considered to be solved if the path reaches the lower right cell.
+        if (stopSolving) {
+            return false;  // Stop maze solving if the flag is set
+        }
+
         if (maze[row][col] == emptyCode) {
             maze[row][col] = pathCode; // add this cell to the path
+            if (stopSolving) {
+                return false;  // Stop maze solving if the flag is set
+            }
             repaint();
             if (row == rows - 2 && col == columns - 2)
                 return true; // path has reached the goal
-            
+
             try {
                 Thread.sleep(speedSleep);
             } catch (InterruptedException e) {
@@ -427,8 +457,9 @@ public class MazeApp extends JPanel implements ActionListener {
             if (solveMazeDFS(row - 1, col) || // try to solve maze by extending path
                 solveMazeDFS(row, col - 1) || // in each possible direction
                 solveMazeDFS(row + 1, col) ||
-                solveMazeDFS(row, col + 1))
+                solveMazeDFS(row, col + 1)){
                 return true;
+            }
 
             // maze can't be solved from this cell, so backtrack out of the cell
             maze[row][col] = visitedCode; // mark cell as having been visited
