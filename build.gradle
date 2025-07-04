@@ -1,0 +1,137 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'idea'
+    id 'eclipse'
+}
+
+group = 'com.mazemaster'
+version = '2.0.0'
+sourceCompatibility = '17'
+targetCompatibility = '17'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Main dependencies - Updated to secure versions
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+    implementation 'ch.qos.logback:logback-classic:1.4.14'  // Updated from 1.4.11 to fix security vulnerability
+    
+    // Test dependencies - Updated versions
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+    testImplementation 'org.mockito:mockito-core:5.8.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
+    testImplementation 'org.assertj:assertj-core:3.24.2'
+    
+    // Optional: For better testing of Swing components
+    testImplementation 'org.assertj:assertj-swing-junit:3.17.1'
+}
+
+application {
+    mainClass = 'com.mazemaster.MazeMasterApplication'
+}
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+javadoc {
+    options.addBooleanOption('html5', true)
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+    }
+}
+
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'com.mazemaster.MazeMasterApplication',
+            'Implementation-Title': 'Maze Master',
+            'Implementation-Version': project.version,
+            'Implementation-Vendor': 'Maze Master Team'
+        )
+    }
+    
+    // Include all dependencies in the JAR (fat JAR)
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
+    archiveBaseName = 'maze-master'
+    archiveVersion = project.version
+}
+
+// Custom task to run the application with proper JVM args
+task runApp(type: JavaExec) {
+    group = 'application'
+    description = 'Run Maze Master with optimized JVM settings'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.mazemaster.MazeMasterApplication'
+    
+    // JVM optimizations for Swing applications
+    jvmArgs = [
+        '-Xms256m',
+        '-Xmx1024m',
+        '-Dsun.java2d.opengl=true',
+        '-Dswing.aatext=true',
+        '-Dawt.useSystemAAFontSettings=on'
+    ]
+    
+    // Enable assertions
+    enableAssertions = true
+}
+
+// Task to generate a distribution
+distributions {
+    main {
+        distributionBaseName = 'maze-master'
+        contents {
+            from jar
+            from 'README.md'
+            from 'LICENSE'
+        }
+    }
+}
+
+// Code quality and analysis
+task checkCode {
+    group = 'verification'
+    description = 'Run all code quality checks'
+    dependsOn test, javadoc
+}
+
+// Custom task to clean build and run
+task cleanRun {
+    group = 'application'
+    description = 'Clean build and run application'
+    dependsOn clean, runApp
+}
+
+// Configure IDE integration
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}
+
+eclipse {
+    classpath {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}

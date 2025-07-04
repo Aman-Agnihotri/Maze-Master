@@ -1,0 +1,9 @@
+rootProject.name = 'maze-master'
+
+// Configure the build cache
+buildCache {
+    local {
+        enabled = true
+        directory = new File(rootDir, '.gradle/build-cache')
+    }
+}
