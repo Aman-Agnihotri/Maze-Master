@@ -19,7 +19,6 @@ public class MazeSolver {
         strategies.put("Depth First Search", new DepthFirstSearchSolver());
         strategies.put("Breadth First Search", new BreadthFirstSearchSolver());
         strategies.put("A*", new AStarSolver());
-        strategies.put("Dijkstra", new DijkstraSolver());
     }
     
     public void setSolvingListener(MazeSolvingListener listener) {
@@ -421,15 +420,4 @@ public class MazeSolver {
         }
     }
     
-    /**
-     * Dijkstra's algorithm solver (guaranteed shortest path without heuristic)
-     */
-    private class DijkstraSolver implements MazeSolvingStrategy {
-        @Override
-        public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag) {
-            // TODO: Implement Dijkstra's algorithm
-            // For now, delegate to BFS (which is equivalent for unweighted graphs)
-            return new BreadthFirstSearchSolver().solve(maze, listener, stopFlag);
-        }
-    }
 }
