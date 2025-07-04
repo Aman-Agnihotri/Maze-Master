@@ -44,6 +44,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JTextField rowsField;
     private JTextField columnsField;
     private JLabel statusLabel;
+    private JSlider speedSlider;
 
     // Window persistence
     private static final Preferences prefs = Preferences.userNodeForPackage(SwingMazeView.class);
@@ -53,6 +54,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private static final String PREF_WINDOW_HEIGHT = "window.height";
     private static final String PREF_WINDOW_MAXIMIZED = "window.maximized";
     private static final String PREF_ZOOM_LEVEL = "maze.zoom.level";
+    private static final String PREF_ANIMATION_SPEED = "animation.speed";
     
     // Color scheme
     private final Color[] mazeColors = {
@@ -105,6 +107,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     int defaultWidth = 1200;
     int defaultHeight = 800;
     int defaultZoom = 12; // Default cell size
+    int defaultSpeed = 25; // Default animation speed
     
     // Load saved window settings
     int x = prefs.getInt(PREF_WINDOW_X, -1);
@@ -113,6 +116,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     int height = prefs.getInt(PREF_WINDOW_HEIGHT, defaultHeight);
     boolean wasMaximized = prefs.getBoolean(PREF_WINDOW_MAXIMIZED, false);
     int zoomLevel = prefs.getInt(PREF_ZOOM_LEVEL, defaultZoom);
+    int animationSpeed = prefs.getInt(PREF_ANIMATION_SPEED, defaultSpeed);
     
     // Set window size
     setSize(width, height);
@@ -132,6 +136,12 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     // Set zoom level
     if (mazePanel != null) {
         mazePanel.setCellSize(zoomLevel);
+    }
+
+    // Set animation speed
+    if (speedSlider != null) {
+        speedSlider.setValue(animationSpeed);
+        controller.setAnimationSpeed(animationSpeed);
     }
 }
 
@@ -168,6 +178,11 @@ public void saveWindowSettings() {
     // Save zoom level
     if (mazePanel != null) {
         prefs.putInt(PREF_ZOOM_LEVEL, mazePanel.getCellSize());
+    }
+
+    // Save animation speed
+    if (speedSlider != null) {
+        prefs.putInt(PREF_ANIMATION_SPEED, speedSlider.getValue());
     }
 }
     
@@ -282,7 +297,7 @@ public void saveWindowSettings() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createTitledBorder("Animation Speed"));
 
-        JSlider speedSlider = new JSlider(JSlider.VERTICAL, 1, 100, 30);
+        speedSlider = new JSlider(JSlider.VERTICAL, 1, 100, 30);
         speedSlider.setMajorTickSpacing(25);
         speedSlider.setMinorTickSpacing(5);
         speedSlider.setPaintTicks(true);
@@ -291,6 +306,7 @@ public void saveWindowSettings() {
         speedSlider.addChangeListener(e -> {
             int speed = speedSlider.getValue();
             controller.setAnimationSpeed(speed);
+            saveWindowSettings();
         });
         
         panel.add(new JLabel("Fast", JLabel.CENTER), BorderLayout.NORTH);
