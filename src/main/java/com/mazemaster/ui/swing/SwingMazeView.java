@@ -17,6 +17,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
+import java.util.prefs.Preferences;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+
 /**
  * Swing implementation of the MazeView interface.
  * Provides a modern, responsive user interface for the maze application.
@@ -40,7 +44,14 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JTextField rowsField;
     private JTextField columnsField;
     private JLabel statusLabel;
-    private JProgressBar progressBar;
+
+    // Window persistence
+    private static final Preferences prefs = Preferences.userNodeForPackage(SwingMazeView.class);
+    private static final String PREF_WINDOW_X = "window.x";
+    private static final String PREF_WINDOW_Y = "window.y";
+    private static final String PREF_WINDOW_WIDTH = "window.width";
+    private static final String PREF_WINDOW_HEIGHT = "window.height";
+    private static final String PREF_WINDOW_MAXIMIZED = "window.maximized";
     
     // Color scheme
     private final Color[] mazeColors = {
@@ -63,7 +74,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     }
     
     private void initializeUI() {
-        setTitle("Maze Master - Advanced Edition");
+        setTitle("Maze Master - Definitive Edition");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
         
@@ -84,9 +95,68 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         }
         
         pack();
-        setLocationRelativeTo(null);
+        loadWindowSettings();
+        addWindowPersistenceListeners();
+    }
+
+    private void loadWindowSettings() {
+    // Default window size if no preferences exist
+    int defaultWidth = 1200;
+    int defaultHeight = 800;
+    
+    // Load saved window settings
+    int x = prefs.getInt(PREF_WINDOW_X, -1);
+    int y = prefs.getInt(PREF_WINDOW_Y, -1);
+    int width = prefs.getInt(PREF_WINDOW_WIDTH, defaultWidth);
+    int height = prefs.getInt(PREF_WINDOW_HEIGHT, defaultHeight);
+    boolean wasMaximized = prefs.getBoolean(PREF_WINDOW_MAXIMIZED, false);
+    
+    // Set window size
+    setSize(width, height);
+    
+    // Set window position (center if no saved position)
+    if (x >= 0 && y >= 0) {
+        setLocation(x, y);
+    } else {
+        setLocationRelativeTo(null); // Center on screen
+    }
+    
+    // Set maximized state
+    if (wasMaximized) {
         setExtendedState(JFrame.MAXIMIZED_BOTH);
     }
+}
+
+private void addWindowPersistenceListeners() {
+    // Save window settings when moved or resized
+    addComponentListener(new ComponentAdapter() {
+        @Override
+        public void componentResized(ComponentEvent e) {
+            saveWindowSettings();
+        }
+        
+        @Override
+        public void componentMoved(ComponentEvent e) {
+            saveWindowSettings();
+        }
+    });
+    
+    // Save maximized state changes
+    addPropertyChangeListener("extendedState", evt -> saveWindowSettings());
+}
+
+private void saveWindowSettings() {
+    // Don't save if window is maximized (save the restored size instead)
+    if (getExtendedState() != JFrame.MAXIMIZED_BOTH) {
+        prefs.putInt(PREF_WINDOW_X, getX());
+        prefs.putInt(PREF_WINDOW_Y, getY());
+        prefs.putInt(PREF_WINDOW_WIDTH, getWidth());
+        prefs.putInt(PREF_WINDOW_HEIGHT, getHeight());
+    }
+    
+    // Always save maximized state
+    prefs.putBoolean(PREF_WINDOW_MAXIMIZED, getExtendedState() == JFrame.MAXIMIZED_BOTH);
+}
     
     private JPanel createTopControlPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -225,11 +295,6 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         statusLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
         panel.add(statusLabel, BorderLayout.WEST);
         
-        progressBar = new JProgressBar();
-        progressBar.setVisible(false);
-        progressBar.setStringPainted(true);
-        panel.add(progressBar, BorderLayout.EAST);
-        
         return panel;
     }
     
@@ -246,6 +311,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                saveWindowSettings();
                 controller.shutdown();
                 System.exit(0);
             }
@@ -301,8 +367,6 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     public void onGenerationStarted() {
         SwingUtilities.invokeLater(() -> {
             statusLabel.setText("Generating maze...");
-            progressBar.setVisible(true);
-            progressBar.setIndeterminate(true);
             resetButton.setText("Stop");
             updateControlsState(true, false);
         });
@@ -312,7 +376,6 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     public void onGenerationCompleted() {
         SwingUtilities.invokeLater(() -> {
             statusLabel.setText("Maze generation completed");
-            progressBar.setVisible(false);
             resetButton.setText("Reset");
             updateControlsState(false, false);
         });
@@ -322,8 +385,6 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     public void onSolvingStarted() {
         SwingUtilities.invokeLater(() -> {
             statusLabel.setText("Solving maze...");
-            progressBar.setVisible(true);
-            progressBar.setIndeterminate(true);
             resetButton.setText("Stop");
             updateControlsState(false, true);
         });
@@ -333,7 +394,6 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     public void onSolvingCompleted(boolean solved) {
         SwingUtilities.invokeLater(() -> {
             statusLabel.setText(solved ? "Maze solved!" : "No solution found");
-            progressBar.setVisible(false);
             resetButton.setText("Reset");
             updateControlsState(false, false);
         });
@@ -381,7 +441,6 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     @Override
     public void showProgress(boolean show, String message) {
         SwingUtilities.invokeLater(() -> {
-            progressBar.setVisible(show);
             if (show && message != null) {
                 statusLabel.setText(message);
             }

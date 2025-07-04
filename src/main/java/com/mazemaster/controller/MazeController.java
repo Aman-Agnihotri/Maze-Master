@@ -166,7 +166,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         stopAllOperations();
         
         if (maze != null) {
-            maze.reset();
+            maze.resetSolution();
             if (view != null) {
                 view.updateMaze(maze);
                 view.refresh();
