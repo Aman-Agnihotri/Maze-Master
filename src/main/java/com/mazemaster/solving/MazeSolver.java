@@ -329,6 +329,7 @@ public class MazeSolver {
         private static class Node {
             final Point position;
             final double gCost;
+            @SuppressWarnings("unused")
             final double hCost;
             final double fCost;
             final Node parent;

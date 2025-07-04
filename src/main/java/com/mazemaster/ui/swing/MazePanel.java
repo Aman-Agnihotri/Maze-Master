@@ -14,8 +14,8 @@ public class MazePanel extends JPanel {
     private Maze maze;
     private final Color[] colors;
     private int cellSize = 12;
-    private static final int minCellSize = 2;
-    private static final int maxCellSize = 50;
+    private static final int MIN_CELL_SIZE = 2;
+    private static final int MAX_CELL_SIZE = 50;
     
     // Rendering settings
     private boolean antialiasing = true;
@@ -45,7 +45,7 @@ public class MazePanel extends JPanel {
     }
     
     public void setCellSize(int cellSize) {
-        this.cellSize = Math.max(minCellSize, Math.min(maxCellSize, cellSize));
+        this.cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, cellSize));
         updatePreferredSize();
         revalidate();
         repaint();
@@ -66,13 +66,13 @@ public class MazePanel extends JPanel {
 }
     
     public void zoomIn() {
-        if (cellSize < maxCellSize) {
+        if (cellSize < MAX_CELL_SIZE) {
             setCellSize(cellSize + 1);
         }
     }
     
     public void zoomOut() {
-        if (cellSize > minCellSize) {
+        if (cellSize > MIN_CELL_SIZE) {
             setCellSize(cellSize - 1);
         }
     }
