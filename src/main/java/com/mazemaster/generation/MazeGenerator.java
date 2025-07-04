@@ -50,64 +50,76 @@ public class MazeGenerator {
         
         @Override
         public void generate(Maze maze, MazeGenerationListener listener, AtomicBoolean stopFlag) {
-            int rows = maze.getRows();
-            int cols = maze.getColumns();
+            int rows = ensureOddDimension(maze.getRows());
+            int cols = ensureOddDimension(maze.getColumns());
             
-            // Ensure odd dimensions for proper generation
-            if (rows % 2 == 0) rows--;
-            if (cols % 2 == 0) cols--;
+            List<Wall> walls = createInitialRoomsAndWalls(maze, rows, cols, listener, stopFlag);
+            if (stopFlag.get()) return;
             
-            // Create room grid and wall list
+            processWalls(maze, walls, listener, stopFlag);
+            if (stopFlag.get()) return;
+            
+            convertRoomNumbersToEmptyCells(maze, rows, cols, listener);
+            
+            if (listener != null) {
+                listener.onGenerationComplete();
+            }
+        }
+        
+        private int ensureOddDimension(int dimension) {
+            return dimension % 2 == 0 ? dimension - 1 : dimension;
+        }
+        
+        private List<Wall> createInitialRoomsAndWalls(Maze maze, int rows, int cols, 
+                                                    MazeGenerationListener listener, AtomicBoolean stopFlag) {
             List<Wall> walls = new ArrayList<>();
             int roomCount = 0;
             
-            // Create rooms (negative numbers to track connectivity)
             for (int i = 1; i < rows - 1; i += 2) {
                 for (int j = 1; j < cols - 1; j += 2) {
+                    if (stopFlag.get()) return walls;
+                    
                     roomCount++;
                     maze.setCell(i, j, -roomCount);
                     
-                    if (listener != null) {
-                        listener.onCellChanged(i, j, Maze.EMPTY);
-                        listener.onGenerationStep();
-                    }
+                    notifyRoomCreated(listener, i, j);
+                    addWallsAroundRoom(walls, i, j, rows, cols);
                     
-                    // Add walls around this room
-                    if (i < rows - 2) {
-                        walls.add(new Wall(i + 1, j));
-                    }
-                    if (j < cols - 2) {
-                        walls.add(new Wall(i, j + 1));
-                    }
-                    
-                    if (stopFlag.get()) return;
-                    
-                    try {
-                        Thread.sleep(delayMs / 4); // Faster room creation
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
+                    sleepBriefly();
                 }
             }
             
-            // Randomly tear down walls
+            return walls;
+        }
+        
+        private void notifyRoomCreated(MazeGenerationListener listener, int row, int col) {
+            if (listener != null) {
+                listener.onCellChanged(row, col, Maze.EMPTY);
+                listener.onGenerationStep();
+            }
+        }
+        
+        private void addWallsAroundRoom(List<Wall> walls, int row, int col, int rows, int cols) {
+            if (row < rows - 2) {
+                walls.add(new Wall(row + 1, col));
+            }
+            if (col < cols - 2) {
+                walls.add(new Wall(row, col + 1));
+            }
+        }
+        
+        private void processWalls(Maze maze, List<Wall> walls, MazeGenerationListener listener, AtomicBoolean stopFlag) {
             Collections.shuffle(walls, random);
             
             for (Wall wall : walls) {
                 if (stopFlag.get()) return;
                 
                 tearDownWall(maze, wall.row, wall.col, listener);
-                
-                try {
-                    Thread.sleep(delayMs);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+                sleep();
             }
-            
-            // Convert negative room numbers to empty cells
+        }
+        
+        private void convertRoomNumbersToEmptyCells(Maze maze, int rows, int cols, MazeGenerationListener listener) {
             for (int i = 1; i < rows - 1; i++) {
                 for (int j = 1; j < cols - 1; j++) {
                     if (maze.getCell(i, j) < 0) {
@@ -118,37 +130,45 @@ public class MazeGenerator {
                     }
                 }
             }
-            
-            if (listener != null) {
-                listener.onGenerationComplete();
-            }
         }
         
         private void tearDownWall(Maze maze, int row, int col, MazeGenerationListener listener) {
-            if (row % 2 == 1) { // Horizontal wall
-                int leftRoom = maze.getCell(row, col - 1);
-                int rightRoom = maze.getCell(row, col + 1);
-                
-                if (leftRoom != rightRoom) {
-                    fillRoom(maze, row, col - 1, leftRoom, rightRoom);
-                    maze.setCell(row, col, rightRoom);
-                    
-                    if (listener != null) {
-                        listener.onCellChanged(row, col, Maze.EMPTY);
-                    }
-                }
-            } else { // Vertical wall
-                int topRoom = maze.getCell(row - 1, col);
-                int bottomRoom = maze.getCell(row + 1, col);
-                
-                if (topRoom != bottomRoom) {
-                    fillRoom(maze, row - 1, col, topRoom, bottomRoom);
-                    maze.setCell(row, col, bottomRoom);
-                    
-                    if (listener != null) {
-                        listener.onCellChanged(row, col, Maze.EMPTY);
-                    }
-                }
+            if (isHorizontalWall(row)) {
+                tearDownHorizontalWall(maze, row, col, listener);
+            } else {
+                tearDownVerticalWall(maze, row, col, listener);
+            }
+        }
+        
+        private boolean isHorizontalWall(int row) {
+            return row % 2 == 1;
+        }
+        
+        private void tearDownHorizontalWall(Maze maze, int row, int col, MazeGenerationListener listener) {
+            int leftRoom = maze.getCell(row, col - 1);
+            int rightRoom = maze.getCell(row, col + 1);
+            
+            if (leftRoom != rightRoom) {
+                fillRoom(maze, row, col - 1, leftRoom, rightRoom);
+                maze.setCell(row, col, rightRoom);
+                notifyWallRemoved(listener, row, col);
+            }
+        }
+        
+        private void tearDownVerticalWall(Maze maze, int row, int col, MazeGenerationListener listener) {
+            int topRoom = maze.getCell(row - 1, col);
+            int bottomRoom = maze.getCell(row + 1, col);
+            
+            if (topRoom != bottomRoom) {
+                fillRoom(maze, row - 1, col, topRoom, bottomRoom);
+                maze.setCell(row, col, bottomRoom);
+                notifyWallRemoved(listener, row, col);
+            }
+        }
+        
+        private void notifyWallRemoved(MazeGenerationListener listener, int row, int col) {
+            if (listener != null) {
+                listener.onCellChanged(row, col, Maze.EMPTY);
             }
         }
         
@@ -159,6 +179,22 @@ public class MazeGenerator {
                 fillRoom(maze, row - 1, col, oldValue, newValue);
                 fillRoom(maze, row, col + 1, oldValue, newValue);
                 fillRoom(maze, row, col - 1, oldValue, newValue);
+            }
+        }
+        
+        private void sleepBriefly() {
+            sleep(delayMs / 4); // Faster room creation
+        }
+        
+        private void sleep() {
+            sleep(delayMs);
+        }
+        
+        private void sleep(int milliseconds) {
+            try {
+                Thread.sleep(milliseconds);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
     }
