@@ -48,6 +48,9 @@ public class MazeSolver {
      * Depth-First Search solver (recursive backtracking)
      */
     private class DepthFirstSearchSolver implements MazeSolvingStrategy {
+        private final int[] deltaRow = {-1, 0, 1, 0};
+        private final int[] deltaCol = {0, 1, 0, -1};
+        
         @Override
         public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag) {
             boolean result = solveDFS(maze, maze.getStartRow(), maze.getStartCol(), listener, stopFlag);
@@ -60,53 +63,78 @@ public class MazeSolver {
         }
         
         private boolean solveDFS(Maze maze, int row, int col, MazeSolvingListener listener, AtomicBoolean stopFlag) {
-            if (stopFlag.get()) return false;
-            
-            if (maze.isEmpty(row, col)) {
-                maze.setCell(row, col, Maze.PATH);
-                
-                if (listener != null) {
-                    listener.onCellExplored(row, col);
-                }
-                
-                // Check if goal reached
-                if (row == maze.getGoalRow() && col == maze.getGoalCol()) {
-                    return true;
-                }
-                
-                try {
-                    Thread.sleep(delayMs);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return false;
-                }
-                
-                // Try all four directions
-                int[] deltaRow = {-1, 0, 1, 0};
-                int[] deltaCol = {0, 1, 0, -1};
-                
-                for (int i = 0; i < 4; i++) {
-                    if (solveDFS(maze, row + deltaRow[i], col + deltaCol[i], listener, stopFlag)) {
-                        return true;
-                    }
-                }
-                
-                // Backtrack
-                maze.setCell(row, col, Maze.VISITED);
-                
-                if (listener != null) {
-                    listener.onCellBacktracked(row, col);
-                }
-                
-                try {
-                    Thread.sleep(delayMs);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return false;
-                }
+            if (stopFlag.get() || !maze.isEmpty(row, col)) {
+                return false;
             }
             
+            // Mark current cell as part of path
+            maze.setCell(row, col, Maze.PATH);
+            notifyExploration(listener, row, col);
+            
+            // Check if goal is reached
+            if (isGoalReached(maze, row, col)) {
+                return true;
+            }
+            
+            // Wait for animation
+            if (!sleep()) {
+                return false;
+            }
+            
+            // Try all four directions
+            if (exploreDirections(maze, row, col, listener, stopFlag)) {
+                return true;
+            }
+            
+            // Backtrack - mark as visited and notify
+            backtrack(maze, row, col, listener);
             return false;
+        }
+        
+        private void notifyExploration(MazeSolvingListener listener, int row, int col) {
+            if (listener != null) {
+                listener.onCellExplored(row, col);
+            }
+        }
+        
+        private boolean isGoalReached(Maze maze, int row, int col) {
+            return row == maze.getGoalRow() && col == maze.getGoalCol();
+        }
+        
+        private boolean sleep() {
+            try {
+                Thread.sleep(delayMs);
+                return true;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        
+        private boolean exploreDirections(Maze maze, int row, int col, MazeSolvingListener listener, AtomicBoolean stopFlag) {
+            for (int i = 0; i < 4; i++) {
+                int newRow = row + deltaRow[i];
+                int newCol = col + deltaCol[i];
+                
+                if (solveDFS(maze, newRow, newCol, listener, stopFlag)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        private void backtrack(Maze maze, int row, int col, MazeSolvingListener listener) {
+            maze.setCell(row, col, Maze.VISITED);
+            
+            if (listener != null) {
+                listener.onCellBacktracked(row, col);
+            }
+            
+            try {
+                Thread.sleep(delayMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
     
@@ -114,6 +142,9 @@ public class MazeSolver {
      * Breadth-First Search solver (guarantees shortest path)
      */
     private class BreadthFirstSearchSolver implements MazeSolvingStrategy {
+        private final int[] deltaRow = {-1, 0, 1, 0};
+        private final int[] deltaCol = {0, 1, 0, -1};
+
         @Override
         public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag) {
             Queue<Point> queue = new LinkedList<>();
@@ -122,59 +153,81 @@ public class MazeSolver {
             Point start = new Point(maze.getStartRow(), maze.getStartCol());
             Point goal = new Point(maze.getGoalRow(), maze.getGoalCol());
             
-            queue.offer(start);
-            maze.setCell(start.x, start.y, Maze.PATH);
-            parent.put(start, null);
-            
-            int[] deltaRow = {-1, 0, 1, 0};
-            int[] deltaCol = {0, 1, 0, -1};
+            initializeBFS(maze, queue, parent, start);
             
             while (!queue.isEmpty() && !stopFlag.get()) {
                 Point current = queue.poll();
                 
                 if (current.equals(goal)) {
-                    // Reconstruct and highlight path
-                    List<Point> path = reconstructPath(parent, goal);
-                    highlightPath(maze, path, listener);
-                    
-                    if (listener != null) {
-                        listener.onPathFound(path);
-                        listener.onSolvingComplete(true);
-                    }
-                    
-                    return true;
+                    return handleSolutionFound(maze, parent, goal, listener);
                 }
                 
-                // Explore neighbors
-                for (int i = 0; i < 4; i++) {
-                    int newRow = current.x + deltaRow[i];
-                    int newCol = current.y + deltaCol[i];
-                    Point neighbor = new Point(newRow, newCol);
-                    
-                    if (maze.isEmpty(newRow, newCol)) {
-                        maze.setCell(newRow, newCol, Maze.PATH);
-                        queue.offer(neighbor);
-                        parent.put(neighbor, current);
-                        
-                        if (listener != null) {
-                            listener.onCellExplored(newRow, newCol);
-                        }
-                        
-                        try {
-                            Thread.sleep(delayMs);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            return false;
-                        }
-                    }
-                }
+                exploreNeighbors(maze, current, queue, parent, listener, stopFlag);
             }
             
             if (listener != null) {
                 listener.onSolvingComplete(false);
             }
-            
             return false;
+        }
+
+        private void initializeBFS(Maze maze, Queue<Point> queue, Map<Point, Point> parent, Point start) {
+            queue.offer(start);
+            maze.setCell(start.x, start.y, Maze.PATH);
+            parent.put(start, null);
+        }
+        
+        private boolean handleSolutionFound(Maze maze, Map<Point, Point> parent, Point goal, MazeSolvingListener listener) {
+            List<Point> path = reconstructPath(parent, goal);
+            highlightPath(maze, path, listener);
+            
+            if (listener != null) {
+                listener.onPathFound(path);
+                listener.onSolvingComplete(true);
+            }
+            return true;
+        }
+        
+        private void exploreNeighbors(Maze maze, Point current, Queue<Point> queue, 
+                                    Map<Point, Point> parent, MazeSolvingListener listener, AtomicBoolean stopFlag) {
+            for (int i = 0; i < 4; i++) {
+                if (stopFlag.get()) {
+                    return;
+                }
+                
+                int newRow = current.x + deltaRow[i];
+                int newCol = current.y + deltaCol[i];
+                Point neighbor = new Point(newRow, newCol);
+                
+                if (maze.isEmpty(newRow, newCol)) {
+                    processValidNeighbor(maze, neighbor, current, queue, parent, listener);
+                    
+                    if (!sleep()) {
+                        return;
+                    }
+                }
+            }
+        }
+        
+        private void processValidNeighbor(Maze maze, Point neighbor, Point current, 
+                                        Queue<Point> queue, Map<Point, Point> parent, MazeSolvingListener listener) {
+            maze.setCell(neighbor.x, neighbor.y, Maze.PATH);
+            queue.offer(neighbor);
+            parent.put(neighbor, current);
+            
+            if (listener != null) {
+                listener.onCellExplored(neighbor.x, neighbor.y);
+            }
+        }
+        
+        private boolean sleep() {
+            try {
+                Thread.sleep(delayMs);
+                return true;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
         }
         
         private List<Point> reconstructPath(Map<Point, Point> parent, Point goal) {
@@ -198,10 +251,7 @@ public class MazeSolver {
                     listener.onCellExplored(point.x, point.y);
                 }
                 
-                try {
-                    Thread.sleep(delayMs);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                if (!sleep()) {
                     return;
                 }
             }
@@ -212,6 +262,9 @@ public class MazeSolver {
      * A* Search solver (heuristic-based, optimal)
      */
     private class AStarSolver implements MazeSolvingStrategy {
+        private final int[] deltaRow = {-1, 0, 1, 0};
+        private final int[] deltaCol = {0, 1, 0, -1};
+
         @Override
         public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag) {
             PriorityQueue<Node> openSet = new PriorityQueue<>(Comparator.comparingDouble(n -> n.fCost));
@@ -221,66 +274,21 @@ public class MazeSolver {
             Point start = new Point(maze.getStartRow(), maze.getStartCol());
             Point goal = new Point(maze.getGoalRow(), maze.getGoalCol());
             
-            Node startNode = new Node(start, 0, manhattanDistance(start, goal), null);
-            openSet.offer(startNode);
-            allNodes.put(start, startNode);
-            
-            int[] deltaRow = {-1, 0, 1, 0};
-            int[] deltaCol = {0, 1, 0, -1};
+            initializeSearch(openSet, allNodes, start, goal);
             
             while (!openSet.isEmpty() && !stopFlag.get()) {
                 Node current = openSet.poll();
                 closedSet.add(current.position);
                 
-                maze.setCell(current.position.x, current.position.y, Maze.PATH);
-                
-                if (listener != null) {
-                    listener.onCellExplored(current.position.x, current.position.y);
-                }
+                updateMazeAndNotify(maze, current, listener);
                 
                 if (current.position.equals(goal)) {
-                    // Reconstruct and highlight path
-                    List<Point> path = reconstructPath(current);
-                    highlightPath(maze, path, listener);
-                    
-                    if (listener != null) {
-                        listener.onPathFound(path);
-                        listener.onSolvingComplete(true);
-                    }
-                    
-                    return true;
+                    return handleSolutionFound(maze, current, listener);
                 }
                 
-                // Explore neighbors
-                for (int i = 0; i < 4; i++) {
-                    int newRow = current.position.x + deltaRow[i];
-                    int newCol = current.position.y + deltaCol[i];
-                    Point neighbor = new Point(newRow, newCol);
-                    
-                    if (!maze.isValidPosition(newRow, newCol) || 
-                        !maze.isWalkable(newRow, newCol) || 
-                        closedSet.contains(neighbor)) {
-                        continue;
-                    }
-                    
-                    double tentativeGCost = current.gCost + 1;
-                    Node neighborNode = allNodes.get(neighbor);
-                    
-                    if (neighborNode == null || tentativeGCost < neighborNode.gCost) {
-                        double hCost = manhattanDistance(neighbor, goal);
-                        neighborNode = new Node(neighbor, tentativeGCost, hCost, current);
-                        allNodes.put(neighbor, neighborNode);
-                        
-                        if (!openSet.contains(neighborNode)) {
-                            openSet.offer(neighborNode);
-                        }
-                    }
-                }
+                exploreNeighbors(maze, current, goal, openSet, allNodes, closedSet);
                 
-                try {
-                    Thread.sleep(delayMs);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                if (!sleep()) {
                     return false;
                 }
             }
@@ -288,8 +296,77 @@ public class MazeSolver {
             if (listener != null) {
                 listener.onSolvingComplete(false);
             }
-            
             return false;
+        }
+
+        private void initializeSearch(PriorityQueue<Node> openSet, Map<Point, Node> allNodes, Point start, Point goal) {
+            Node startNode = new Node(start, 0, manhattanDistance(start, goal), null);
+            openSet.offer(startNode);
+            allNodes.put(start, startNode);
+        }
+        
+        private void updateMazeAndNotify(Maze maze, Node current, MazeSolvingListener listener) {
+            maze.setCell(current.position.x, current.position.y, Maze.PATH);
+            if (listener != null) {
+                listener.onCellExplored(current.position.x, current.position.y);
+            }
+        }
+        
+        private boolean handleSolutionFound(Maze maze, Node goalNode, MazeSolvingListener listener) {
+            List<Point> path = reconstructPath(goalNode);
+            highlightPath(maze, path, listener);
+            
+            if (listener != null) {
+                listener.onPathFound(path);
+                listener.onSolvingComplete(true);
+            }
+            return true;
+        }
+        
+        private void exploreNeighbors(Maze maze, Node current, Point goal, PriorityQueue<Node> openSet, 
+                                    Map<Point, Node> allNodes, Set<Point> closedSet) {
+            for (int i = 0; i < 4; i++) {
+                int newRow = current.position.x + deltaRow[i];
+                int newCol = current.position.y + deltaCol[i];
+                Point neighbor = new Point(newRow, newCol);
+                
+                if (shouldSkipNeighbor(maze, neighbor, closedSet)) {
+                    continue;
+                }
+                
+                processNeighbor(current, neighbor, goal, openSet, allNodes);
+            }
+        }
+        
+        private boolean shouldSkipNeighbor(Maze maze, Point neighbor, Set<Point> closedSet) {
+            return !maze.isValidPosition(neighbor.x, neighbor.y) || 
+                !maze.isWalkable(neighbor.x, neighbor.y) || 
+                closedSet.contains(neighbor);
+        }
+        
+        private void processNeighbor(Node current, Point neighbor, Point goal, PriorityQueue<Node> openSet, Map<Point, Node> allNodes) {
+            double tentativeGCost = current.gCost + 1;
+            Node neighborNode = allNodes.get(neighbor);
+            
+            if (neighborNode == null || tentativeGCost < neighborNode.gCost) {
+                double hCost = manhattanDistance(neighbor, goal);
+                neighborNode = new Node(neighbor, tentativeGCost, hCost, current);
+                allNodes.put(neighbor, neighborNode);
+                
+                if (!openSet.contains(neighborNode)) {
+                    openSet.offer(neighborNode);
+                }
+            }
+        }
+        
+        private boolean sleep() {
+            try {
+                Thread.sleep(delayMs);
+                return true;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
         }
         
         private double manhattanDistance(Point a, Point b) {
