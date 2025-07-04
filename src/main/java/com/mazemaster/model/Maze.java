@@ -53,7 +53,7 @@ public class Maze implements Serializable {
     public void resetSolution() {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
-                if (grid[i][j] == PATH || grid[i][j] == VISITED) {
+                if (grid[i][j] == PATH || grid[i][j] == VISITED || grid[i][j] == START) {
                     grid[i][j] = EMPTY;
                 }
             }

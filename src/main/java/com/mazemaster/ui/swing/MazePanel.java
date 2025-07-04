@@ -49,7 +49,21 @@ public class MazePanel extends JPanel {
         updatePreferredSize();
         revalidate();
         repaint();
+
+        // Notify parent to save zoom level
+        notifyZoomChanged();
     }
+
+    private void notifyZoomChanged() {
+    // Find the parent SwingMazeView and save settings
+    Container parent = getParent();
+    while (parent != null && !(parent instanceof SwingMazeView)) {
+        parent = parent.getParent();
+    }
+    if (parent instanceof SwingMazeView swingMazeView) {
+        swingMazeView.saveWindowSettings();
+    }
+}
     
     public void zoomIn() {
         if (cellSize < maxCellSize) {

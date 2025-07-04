@@ -293,7 +293,7 @@ public class MazeSolver {
         }
         
         private double manhattanDistance(Point a, Point b) {
-            return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+            return (double) Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
         }
         
         private List<Point> reconstructPath(Node goal) {

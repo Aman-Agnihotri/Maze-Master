@@ -52,6 +52,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private static final String PREF_WINDOW_WIDTH = "window.width";
     private static final String PREF_WINDOW_HEIGHT = "window.height";
     private static final String PREF_WINDOW_MAXIMIZED = "window.maximized";
+    private static final String PREF_ZOOM_LEVEL = "maze.zoom.level";
     
     // Color scheme
     private final Color[] mazeColors = {
@@ -103,6 +104,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     // Default window size if no preferences exist
     int defaultWidth = 1200;
     int defaultHeight = 800;
+    int defaultZoom = 12; // Default cell size
     
     // Load saved window settings
     int x = prefs.getInt(PREF_WINDOW_X, -1);
@@ -110,6 +112,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     int width = prefs.getInt(PREF_WINDOW_WIDTH, defaultWidth);
     int height = prefs.getInt(PREF_WINDOW_HEIGHT, defaultHeight);
     boolean wasMaximized = prefs.getBoolean(PREF_WINDOW_MAXIMIZED, false);
+    int zoomLevel = prefs.getInt(PREF_ZOOM_LEVEL, defaultZoom);
     
     // Set window size
     setSize(width, height);
@@ -124,6 +127,11 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     // Set maximized state
     if (wasMaximized) {
         setExtendedState(JFrame.MAXIMIZED_BOTH);
+    }
+
+    // Set zoom level
+    if (mazePanel != null) {
+        mazePanel.setCellSize(zoomLevel);
     }
 }
 
@@ -145,7 +153,7 @@ private void addWindowPersistenceListeners() {
     addPropertyChangeListener("extendedState", evt -> saveWindowSettings());
 }
 
-private void saveWindowSettings() {
+public void saveWindowSettings() {
     // Don't save if window is maximized (save the restored size instead)
     if (getExtendedState() != JFrame.MAXIMIZED_BOTH) {
         prefs.putInt(PREF_WINDOW_X, getX());
@@ -156,6 +164,11 @@ private void saveWindowSettings() {
     
     // Always save maximized state
     prefs.putBoolean(PREF_WINDOW_MAXIMIZED, getExtendedState() == JFrame.MAXIMIZED_BOTH);
+
+    // Save zoom level
+    if (mazePanel != null) {
+        prefs.putInt(PREF_ZOOM_LEVEL, mazePanel.getCellSize());
+    }
 }
     
     private JPanel createTopControlPanel() {
