@@ -32,14 +32,50 @@ public class MazeGenerator {
         return strategies.keySet();
     }
     
-    public void generate(Maze maze, String algorithm, AtomicBoolean stopFlag) {
+    public void generate(Maze maze, String algorithm, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
         MazeGenerationStrategy strategy = strategies.get(algorithm);
         if (strategy == null) {
             strategy = strategies.get("DFS"); // Default fallback
         }
         
         maze.reset();
-        strategy.generate(maze, listener, stopFlag);
+        strategy.generate(maze, listener, stopFlag, pauseFlag);
+    }
+    
+    /**
+     * Utility method to handle pause checking during animation delays
+     */
+    private void waitForResume(AtomicBoolean pauseFlag) {
+        while (pauseFlag.get()) {
+            try {
+                Thread.sleep(100); // Check every 100ms
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+    
+    /**
+     * Enhanced sleep method that respects pause state
+     */
+    private boolean pauseAwareSleep(int milliseconds, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
+        try {
+            // First, wait for any pause to be lifted
+            waitForResume(pauseFlag);
+            
+            // If stopped during pause, return immediately
+            if (stopFlag.get()) {
+                return false;
+            }
+            
+            // Normal sleep with interrupt handling
+            Thread.sleep(milliseconds);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
     
     /**
@@ -49,19 +85,19 @@ public class MazeGenerator {
         private Random random = new Random();
         
         @Override
-        public void generate(Maze maze, MazeGenerationListener listener, AtomicBoolean stopFlag) {
+        public void generate(Maze maze, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             int rows = ensureOddDimension(maze.getRows());
             int cols = ensureOddDimension(maze.getColumns());
             
-            List<Wall> walls = createInitialRoomsAndWalls(maze, rows, cols, listener, stopFlag);
+            List<Wall> walls = createInitialRoomsAndWalls(maze, rows, cols, listener, stopFlag, pauseFlag);
             if (stopFlag.get()) return;
             
-            processWalls(maze, walls, listener, stopFlag);
+            processWalls(maze, walls, listener, stopFlag, pauseFlag);
             if (stopFlag.get()) return;
             
-            convertRoomNumbersToEmptyCells(maze, rows, cols, listener);
+            convertRoomNumbersToEmptyCells(maze, rows, cols, listener, stopFlag, pauseFlag);
             
-            if (listener != null) {
+            if (listener != null && !stopFlag.get()) {
                 listener.onGenerationComplete();
             }
         }
@@ -71,7 +107,7 @@ public class MazeGenerator {
         }
         
         private List<Wall> createInitialRoomsAndWalls(Maze maze, int rows, int cols, 
-                                                    MazeGenerationListener listener, AtomicBoolean stopFlag) {
+                                                    MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             List<Wall> walls = new ArrayList<>();
             int roomCount = 0;
             
@@ -85,7 +121,9 @@ public class MazeGenerator {
                     notifyRoomCreated(listener, i, j);
                     addWallsAroundRoom(walls, i, j, rows, cols);
                     
-                    sleepBriefly();
+                    if (!pauseAwareSleep(delayMs / 4, stopFlag, pauseFlag)) {
+                        return walls;
+                    }
                 }
             }
             
@@ -108,20 +146,25 @@ public class MazeGenerator {
             }
         }
         
-        private void processWalls(Maze maze, List<Wall> walls, MazeGenerationListener listener, AtomicBoolean stopFlag) {
+        private void processWalls(Maze maze, List<Wall> walls, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             Collections.shuffle(walls, random);
             
             for (Wall wall : walls) {
                 if (stopFlag.get()) return;
                 
                 tearDownWall(maze, wall.row, wall.col, listener);
-                sleep();
+                
+                if (!pauseAwareSleep(delayMs, stopFlag, pauseFlag)) {
+                    return;
+                }
             }
         }
         
-        private void convertRoomNumbersToEmptyCells(Maze maze, int rows, int cols, MazeGenerationListener listener) {
+        private void convertRoomNumbersToEmptyCells(Maze maze, int rows, int cols, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             for (int i = 1; i < rows - 1; i++) {
                 for (int j = 1; j < cols - 1; j++) {
+                    if (stopFlag.get()) return;
+                    
                     if (maze.getCell(i, j) < 0) {
                         maze.setCell(i, j, Maze.EMPTY);
                         if (listener != null) {
@@ -181,22 +224,6 @@ public class MazeGenerator {
                 fillRoom(maze, row, col - 1, oldValue, newValue);
             }
         }
-        
-        private void sleepBriefly() {
-            sleep(delayMs / 4); // Faster room creation
-        }
-        
-        private void sleep() {
-            sleep(delayMs);
-        }
-        
-        private void sleep(int milliseconds) {
-            try {
-                Thread.sleep(milliseconds);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
     }
     
     /**
@@ -206,7 +233,7 @@ public class MazeGenerator {
         private Random random = new Random();
         
         @Override
-        public void generate(Maze maze, MazeGenerationListener listener, AtomicBoolean stopFlag) {
+        public void generate(Maze maze, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             int rows = maze.getRows();
             int cols = maze.getColumns();
             
@@ -222,17 +249,17 @@ public class MazeGenerator {
             Collections.shuffle(walls, random);
             
             // Create initial rooms
-            createInitialRooms(maze, rows, cols, listener, stopFlag);
+            createInitialRooms(maze, rows, cols, listener, stopFlag, pauseFlag);
             
             // Process walls using Kruskal's algorithm
-            processWallsKruskal(maze, walls, unionFind, listener, stopFlag);
+            processWallsKruskal(maze, walls, unionFind, listener, stopFlag, pauseFlag);
             
-            if (listener != null) {
+            if (listener != null && !stopFlag.get()) {
                 listener.onGenerationComplete();
             }
         }
         
-        private void createInitialRooms(Maze maze, int rows, int cols, MazeGenerationListener listener, AtomicBoolean stopFlag) {
+        private void createInitialRooms(Maze maze, int rows, int cols, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             for (int i = 1; i < rows - 1; i += 2) {
                 for (int j = 1; j < cols - 1; j += 2) {
                     if (stopFlag.get()) return;
@@ -243,10 +270,7 @@ public class MazeGenerator {
                         listener.onGenerationStep();
                     }
                     
-                    try {
-                        Thread.sleep(delayMs / 8); // Fast room creation
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
+                    if (!pauseAwareSleep(delayMs / 8, stopFlag, pauseFlag)) {
                         return;
                     }
                 }
@@ -273,7 +297,7 @@ public class MazeGenerator {
         }
         
         private void processWallsKruskal(Maze maze, List<Wall> walls, UnionFind unionFind, 
-                                    MazeGenerationListener listener, AtomicBoolean stopFlag) {
+                                    MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             for (Wall wall : walls) {
                 if (stopFlag.get()) return;
                 
@@ -288,10 +312,7 @@ public class MazeGenerator {
                         listener.onGenerationStep();
                     }
                     
-                    try {
-                        Thread.sleep(delayMs);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
+                    if (!pauseAwareSleep(delayMs, stopFlag, pauseFlag)) {
                         return;
                     }
                 }
@@ -360,7 +381,7 @@ public class MazeGenerator {
         private Random random = new Random();
         
         @Override
-        public void generate(Maze maze, MazeGenerationListener listener, AtomicBoolean stopFlag) {
+        public void generate(Maze maze, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             int rows = maze.getRows();
             int cols = maze.getColumns();
             
@@ -378,7 +399,7 @@ public class MazeGenerator {
             int startRow = 1 + (random.nextInt((rows - 2) / 2)) * 2;
             int startCol = 1 + (random.nextInt((cols - 2) / 2)) * 2;
             
-            addCellToMaze(maze, inMaze, startRow, startCol, frontierWalls, listener, stopFlag);
+            addCellToMaze(maze, inMaze, startRow, startCol, frontierWalls, listener, stopFlag, pauseFlag);
             
             // Process frontier walls until maze is complete
             while (!frontierWalls.isEmpty() && !stopFlag.get()) {
@@ -389,17 +410,16 @@ public class MazeGenerator {
                 
                 // Check if we can remove this wall
                 if (canRemoveWall(inMaze, wall)) {
-                    removeWall(maze, inMaze, wall, frontierWalls, listener, stopFlag);
+                    removeWall(maze, inMaze, wall, frontierWalls, listener, stopFlag, pauseFlag);
                 }
             }
             
-            if (listener != null) {
+            if (listener != null && !stopFlag.get()) {
                 listener.onGenerationComplete();
             }
         }
         
-        private void addCellToMaze(Maze maze, boolean[][] inMaze, int row, int col, 
-                                List<Wall> frontierWalls, MazeGenerationListener listener, AtomicBoolean stopFlag) {
+        private void addCellToMaze(Maze maze, boolean[][] inMaze, int row, int col, List<Wall> frontierWalls, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             if (stopFlag.get()) return;
             
             // Mark cell as part of maze
@@ -414,11 +434,7 @@ public class MazeGenerator {
             // Add walls around this cell to frontier
             addSurroundingWalls(row, col, frontierWalls, inMaze, maze.getRows(), maze.getColumns());
             
-            try {
-                Thread.sleep(delayMs / 4);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            pauseAwareSleep(delayMs / 4, stopFlag, pauseFlag);
         }
         
         private void addSurroundingWalls(int row, int col, List<Wall> frontierWalls, boolean[][] inMaze, int rows, int cols) {
@@ -455,7 +471,7 @@ public class MazeGenerator {
             return room1InMaze != room2InMaze; // XOR - exactly one should be true
         }
         
-        private void removeWall(Maze maze, boolean[][] inMaze, Wall wall, List<Wall> frontierWalls, MazeGenerationListener listener, AtomicBoolean stopFlag) {
+        private void removeWall(Maze maze, boolean[][] inMaze, Wall wall, List<Wall> frontierWalls, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             if (stopFlag.get()) return;
             
             // Remove the wall
@@ -465,18 +481,14 @@ public class MazeGenerator {
             int newCellRow = inMaze[wall.room1Row][wall.room1Col] ? wall.room2Row : wall.room1Row;
             int newCellCol = inMaze[wall.room1Row][wall.room1Col] ? wall.room2Col : wall.room1Col;
             
-            addCellToMaze(maze, inMaze, newCellRow, newCellCol, frontierWalls, listener, stopFlag);
+            addCellToMaze(maze, inMaze, newCellRow, newCellCol, frontierWalls, listener, stopFlag, pauseFlag);
             
             if (listener != null) {
                 listener.onCellChanged(wall.row, wall.col, Maze.EMPTY);
                 listener.onGenerationStep();
             }
             
-            try {
-                Thread.sleep(delayMs);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            pauseAwareSleep(delayMs, stopFlag, pauseFlag);
         }
     }
     

@@ -33,14 +33,50 @@ public class MazeSolver {
         return strategies.keySet();
     }
     
-    public boolean solve(Maze maze, String algorithm, AtomicBoolean stopFlag) {
+    public boolean solve(Maze maze, String algorithm, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
         MazeSolvingStrategy strategy = strategies.get(algorithm);
         if (strategy == null) {
             strategy = strategies.get("Depth First Search"); // Default fallback
         }
         
         maze.resetSolution();
-        return strategy.solve(maze, listener, stopFlag);
+        return strategy.solve(maze, listener, stopFlag, pauseFlag);
+    }
+    
+    /**
+     * Utility method to handle pause checking during animation delays
+     */
+    private void waitForResume(AtomicBoolean pauseFlag) {
+        while (pauseFlag.get()) {
+            try {
+                Thread.sleep(100); // Check every 100ms
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+    
+    /**
+     * Enhanced sleep method that respects pause state
+     */
+    private boolean pauseAwareSleep(int milliseconds, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
+        try {
+            // First, wait for any pause to be lifted
+            waitForResume(pauseFlag);
+            
+            // If stopped during pause, return immediately
+            if (stopFlag.get()) {
+                return false;
+            }
+            
+            // Normal sleep with interrupt handling
+            Thread.sleep(milliseconds);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
     
     /**
@@ -51,17 +87,17 @@ public class MazeSolver {
         private final int[] deltaCol = {0, 1, 0, -1};
         
         @Override
-        public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag) {
-            boolean result = solveDFS(maze, maze.getStartRow(), maze.getStartCol(), listener, stopFlag);
+        public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
+            boolean result = solveDFS(maze, maze.getStartRow(), maze.getStartCol(), listener, stopFlag, pauseFlag);
             
-            if (listener != null) {
+            if (listener != null && !stopFlag.get()) {
                 listener.onSolvingComplete(result);
             }
             
             return result;
         }
         
-        private boolean solveDFS(Maze maze, int row, int col, MazeSolvingListener listener, AtomicBoolean stopFlag) {
+        private boolean solveDFS(Maze maze, int row, int col, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             if (stopFlag.get() || !maze.isEmpty(row, col)) {
                 return false;
             }
@@ -75,18 +111,18 @@ public class MazeSolver {
                 return true;
             }
             
-            // Wait for animation
-            if (!sleep()) {
+            // Wait for animation with pause support
+            if (!pauseAwareSleep(delayMs, stopFlag, pauseFlag)) {
                 return false;
             }
             
             // Try all four directions
-            if (exploreDirections(maze, row, col, listener, stopFlag)) {
+            if (exploreDirections(maze, row, col, listener, stopFlag, pauseFlag)) {
                 return true;
             }
             
             // Backtrack - mark as visited and notify
-            backtrack(maze, row, col, listener);
+            backtrack(maze, row, col, listener, stopFlag, pauseFlag);
             return false;
         }
         
@@ -100,40 +136,26 @@ public class MazeSolver {
             return row == maze.getGoalRow() && col == maze.getGoalCol();
         }
         
-        private boolean sleep() {
-            try {
-                Thread.sleep(delayMs);
-                return true;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        }
-        
-        private boolean exploreDirections(Maze maze, int row, int col, MazeSolvingListener listener, AtomicBoolean stopFlag) {
+        private boolean exploreDirections(Maze maze, int row, int col, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             for (int i = 0; i < 4; i++) {
                 int newRow = row + deltaRow[i];
                 int newCol = col + deltaCol[i];
                 
-                if (solveDFS(maze, newRow, newCol, listener, stopFlag)) {
+                if (solveDFS(maze, newRow, newCol, listener, stopFlag, pauseFlag)) {
                     return true;
                 }
             }
             return false;
         }
         
-        private void backtrack(Maze maze, int row, int col, MazeSolvingListener listener) {
+        private void backtrack(Maze maze, int row, int col, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             maze.setCell(row, col, Maze.VISITED);
             
             if (listener != null) {
                 listener.onCellBacktracked(row, col);
             }
             
-            try {
-                Thread.sleep(delayMs);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            pauseAwareSleep(delayMs, stopFlag, pauseFlag);
         }
     }
     
@@ -145,7 +167,7 @@ public class MazeSolver {
         private final int[] deltaCol = {0, 1, 0, -1};
 
         @Override
-        public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag) {
+        public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             Queue<Point> queue = new LinkedList<>();
             Map<Point, Point> parent = new HashMap<>();
             
@@ -158,13 +180,13 @@ public class MazeSolver {
                 Point current = queue.poll();
                 
                 if (current.equals(goal)) {
-                    return handleSolutionFound(maze, parent, goal, listener);
+                    return handleSolutionFound(maze, parent, goal, listener, stopFlag, pauseFlag);
                 }
                 
-                exploreNeighbors(maze, current, queue, parent, listener, stopFlag);
+                exploreNeighbors(maze, current, queue, parent, listener, stopFlag, pauseFlag);
             }
             
-            if (listener != null) {
+            if (listener != null && !stopFlag.get()) {
                 listener.onSolvingComplete(false);
             }
             return false;
@@ -176,11 +198,11 @@ public class MazeSolver {
             parent.put(start, null);
         }
         
-        private boolean handleSolutionFound(Maze maze, Map<Point, Point> parent, Point goal, MazeSolvingListener listener) {
+        private boolean handleSolutionFound(Maze maze, Map<Point, Point> parent, Point goal, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             List<Point> path = reconstructPath(parent, goal);
-            highlightPath(maze, path, listener);
+            highlightPath(maze, path, listener, stopFlag, pauseFlag);
             
-            if (listener != null) {
+            if (listener != null && !stopFlag.get()) {
                 listener.onPathFound(path);
                 listener.onSolvingComplete(true);
             }
@@ -188,7 +210,7 @@ public class MazeSolver {
         }
         
         private void exploreNeighbors(Maze maze, Point current, Queue<Point> queue, 
-                                    Map<Point, Point> parent, MazeSolvingListener listener, AtomicBoolean stopFlag) {
+                                    Map<Point, Point> parent, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             for (int i = 0; i < 4; i++) {
                 if (stopFlag.get()) {
                     return;
@@ -201,7 +223,7 @@ public class MazeSolver {
                 if (maze.isEmpty(newRow, newCol)) {
                     processValidNeighbor(maze, neighbor, current, queue, parent, listener);
                     
-                    if (!sleep()) {
+                    if (!pauseAwareSleep(delayMs, stopFlag, pauseFlag)) {
                         return;
                     }
                 }
@@ -219,16 +241,6 @@ public class MazeSolver {
             }
         }
         
-        private boolean sleep() {
-            try {
-                Thread.sleep(delayMs);
-                return true;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        }
-        
         private List<Point> reconstructPath(Map<Point, Point> parent, Point goal) {
             List<Point> path = new ArrayList<>();
             Point current = goal;
@@ -242,15 +254,19 @@ public class MazeSolver {
             return path;
         }
         
-        private void highlightPath(Maze maze, List<Point> path, MazeSolvingListener listener) {
+        private void highlightPath(Maze maze, List<Point> path, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             for (Point point : path) {
+                if (stopFlag.get()) {
+                    return;
+                }
+                
                 maze.setCell(point.x, point.y, Maze.START); // Use START color for final path
                 
                 if (listener != null) {
                     listener.onCellExplored(point.x, point.y);
                 }
                 
-                if (!sleep()) {
+                if (!pauseAwareSleep(delayMs, stopFlag, pauseFlag)) {
                     return;
                 }
             }
@@ -265,7 +281,7 @@ public class MazeSolver {
         private final int[] deltaCol = {0, 1, 0, -1};
 
         @Override
-        public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag) {
+        public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             PriorityQueue<Node> openSet = new PriorityQueue<>(Comparator.comparingDouble(n -> n.fCost));
             Map<Point, Node> allNodes = new HashMap<>();
             Set<Point> closedSet = new HashSet<>();
@@ -282,17 +298,17 @@ public class MazeSolver {
                 updateMazeAndNotify(maze, current, listener);
                 
                 if (current.position.equals(goal)) {
-                    return handleSolutionFound(maze, current, listener);
+                    return handleSolutionFound(maze, current, listener, stopFlag, pauseFlag);
                 }
                 
                 exploreNeighbors(maze, current, goal, openSet, allNodes, closedSet);
                 
-                if (!sleep()) {
+                if (!pauseAwareSleep(delayMs, stopFlag, pauseFlag)) {
                     return false;
                 }
             }
             
-            if (listener != null) {
+            if (listener != null && !stopFlag.get()) {
                 listener.onSolvingComplete(false);
             }
             return false;
@@ -311,11 +327,11 @@ public class MazeSolver {
             }
         }
         
-        private boolean handleSolutionFound(Maze maze, Node goalNode, MazeSolvingListener listener) {
+        private boolean handleSolutionFound(Maze maze, Node goalNode, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             List<Point> path = reconstructPath(goalNode);
-            highlightPath(maze, path, listener);
+            highlightPath(maze, path, listener, stopFlag, pauseFlag);
             
-            if (listener != null) {
+            if (listener != null && !stopFlag.get()) {
                 listener.onPathFound(path);
                 listener.onSolvingComplete(true);
             }
@@ -358,16 +374,6 @@ public class MazeSolver {
             }
         }
         
-        private boolean sleep() {
-            try {
-                Thread.sleep(delayMs);
-                return true;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        }
-        
         private double manhattanDistance(Point a, Point b) {
             return (double) Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
         }
@@ -385,18 +391,19 @@ public class MazeSolver {
             return path;
         }
         
-        private void highlightPath(Maze maze, List<Point> path, MazeSolvingListener listener) {
+        private void highlightPath(Maze maze, List<Point> path, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             for (Point point : path) {
+                if (stopFlag.get()) {
+                    return;
+                }
+                
                 maze.setCell(point.x, point.y, Maze.START); // Use START color for final path
                 
                 if (listener != null) {
                     listener.onCellExplored(point.x, point.y);
                 }
                 
-                try {
-                    Thread.sleep(delayMs);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                if (!pauseAwareSleep(delayMs, stopFlag, pauseFlag)) {
                     return;
                 }
             }
@@ -419,5 +426,4 @@ public class MazeSolver {
             }
         }
     }
-    
 }

@@ -34,6 +34,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JButton generateButton;
     private JButton solveButton;
     private JButton resetButton;
+    private JButton pauseResumeButton; // New pause/resume button
     private JButton saveButton;
     private JButton loadButton;
     private JButton exportButton;
@@ -103,88 +104,88 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     }
 
     private void loadWindowSettings() {
-    // Default window size if no preferences exist
-    int defaultWidth = 1200;
-    int defaultHeight = 800;
-    int defaultZoom = 12; // Default cell size
-    int defaultSpeed = 25; // Default animation speed
-    
-    // Load saved window settings
-    int x = prefs.getInt(PREF_WINDOW_X, -1);
-    int y = prefs.getInt(PREF_WINDOW_Y, -1);
-    int width = prefs.getInt(PREF_WINDOW_WIDTH, defaultWidth);
-    int height = prefs.getInt(PREF_WINDOW_HEIGHT, defaultHeight);
-    boolean wasMaximized = prefs.getBoolean(PREF_WINDOW_MAXIMIZED, false);
-    int zoomLevel = prefs.getInt(PREF_ZOOM_LEVEL, defaultZoom);
-    int animationSpeed = prefs.getInt(PREF_ANIMATION_SPEED, defaultSpeed);
-    
-    // Set window size
-    setSize(width, height);
-    
-    // Set window position (center if no saved position)
-    if (x >= 0 && y >= 0) {
-        setLocation(x, y);
-    } else {
-        setLocationRelativeTo(null); // Center on screen
-    }
-    
-    // Set maximized state
-    if (wasMaximized) {
-        setExtendedState(JFrame.MAXIMIZED_BOTH);
-    }
-
-    // Set zoom level
-    if (mazePanel != null) {
-        mazePanel.setCellSize(zoomLevel);
-    }
-
-    // Set animation speed
-    if (speedSlider != null) {
-        speedSlider.setValue(animationSpeed);
-        controller.setAnimationSpeed(animationSpeed);
-    }
-}
-
-private void addWindowPersistenceListeners() {
-    // Save window settings when moved or resized
-    addComponentListener(new ComponentAdapter() {
-        @Override
-        public void componentResized(ComponentEvent e) {
-            saveWindowSettings();
+        // Default window size if no preferences exist
+        int defaultWidth = 1200;
+        int defaultHeight = 800;
+        int defaultZoom = 12; // Default cell size
+        int defaultSpeed = 25; // Default animation speed
+        
+        // Load saved window settings
+        int x = prefs.getInt(PREF_WINDOW_X, -1);
+        int y = prefs.getInt(PREF_WINDOW_Y, -1);
+        int width = prefs.getInt(PREF_WINDOW_WIDTH, defaultWidth);
+        int height = prefs.getInt(PREF_WINDOW_HEIGHT, defaultHeight);
+        boolean wasMaximized = prefs.getBoolean(PREF_WINDOW_MAXIMIZED, false);
+        int zoomLevel = prefs.getInt(PREF_ZOOM_LEVEL, defaultZoom);
+        int animationSpeed = prefs.getInt(PREF_ANIMATION_SPEED, defaultSpeed);
+        
+        // Set window size
+        setSize(width, height);
+        
+        // Set window position (center if no saved position)
+        if (x >= 0 && y >= 0) {
+            setLocation(x, y);
+        } else {
+            setLocationRelativeTo(null); // Center on screen
         }
         
-        @Override
-        public void componentMoved(ComponentEvent e) {
-            saveWindowSettings();
+        // Set maximized state
+        if (wasMaximized) {
+            setExtendedState(JFrame.MAXIMIZED_BOTH);
         }
-    });
-    
-    // Save maximized state changes
-    addPropertyChangeListener("extendedState", evt -> saveWindowSettings());
-}
 
-public void saveWindowSettings() {
-    // Don't save if window is maximized (save the restored size instead)
-    if (getExtendedState() != JFrame.MAXIMIZED_BOTH) {
-        prefs.putInt(PREF_WINDOW_X, getX());
-        prefs.putInt(PREF_WINDOW_Y, getY());
-        prefs.putInt(PREF_WINDOW_WIDTH, getWidth());
-        prefs.putInt(PREF_WINDOW_HEIGHT, getHeight());
-    }
-    
-    // Always save maximized state
-    prefs.putBoolean(PREF_WINDOW_MAXIMIZED, getExtendedState() == JFrame.MAXIMIZED_BOTH);
+        // Set zoom level
+        if (mazePanel != null) {
+            mazePanel.setCellSize(zoomLevel);
+        }
 
-    // Save zoom level
-    if (mazePanel != null) {
-        prefs.putInt(PREF_ZOOM_LEVEL, mazePanel.getCellSize());
+        // Set animation speed
+        if (speedSlider != null) {
+            speedSlider.setValue(animationSpeed);
+            controller.setAnimationSpeed(animationSpeed);
+        }
     }
 
-    // Save animation speed
-    if (speedSlider != null) {
-        prefs.putInt(PREF_ANIMATION_SPEED, speedSlider.getValue());
+    private void addWindowPersistenceListeners() {
+        // Save window settings when moved or resized
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                saveWindowSettings();
+            }
+            
+            @Override
+            public void componentMoved(ComponentEvent e) {
+                saveWindowSettings();
+            }
+        });
+        
+        // Save maximized state changes
+        addPropertyChangeListener("extendedState", evt -> saveWindowSettings());
     }
-}
+
+    public void saveWindowSettings() {
+        // Don't save if window is maximized (save the restored size instead)
+        if (getExtendedState() != JFrame.MAXIMIZED_BOTH) {
+            prefs.putInt(PREF_WINDOW_X, getX());
+            prefs.putInt(PREF_WINDOW_Y, getY());
+            prefs.putInt(PREF_WINDOW_WIDTH, getWidth());
+            prefs.putInt(PREF_WINDOW_HEIGHT, getHeight());
+        }
+        
+        // Always save maximized state
+        prefs.putBoolean(PREF_WINDOW_MAXIMIZED, getExtendedState() == JFrame.MAXIMIZED_BOTH);
+
+        // Save zoom level
+        if (mazePanel != null) {
+            prefs.putInt(PREF_ZOOM_LEVEL, mazePanel.getCellSize());
+        }
+
+        // Save animation speed
+        if (speedSlider != null) {
+            prefs.putInt(PREF_ANIMATION_SPEED, speedSlider.getValue());
+        }
+    }
     
     private JPanel createTopControlPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -194,12 +195,17 @@ public void saveWindowSettings() {
         newMazeButton = createButton("New Maze", "Create a new maze with custom dimensions");
         generateButton = createButton("Generate", "Generate a new maze using selected algorithm");
         solveButton = createButton("Solve", "Solve the current maze");
-        resetButton = createButton("Reset", "Reset or stop current operation");
+        pauseResumeButton = createButton("Pause", "Pause or resume current operation");
+        resetButton = createButton("Reset", "Reset maze to blank state (only available when paused or idle)");
+        
+        // Initially disable pause button
+        pauseResumeButton.setEnabled(false);
         
         panel.add(newMazeButton);
         panel.add(Box.createHorizontalStrut(10));
         panel.add(generateButton);
         panel.add(solveButton);
+        panel.add(pauseResumeButton);
         panel.add(resetButton);
         panel.add(Box.createHorizontalStrut(20));
         
@@ -396,7 +402,8 @@ public void saveWindowSettings() {
     public void onGenerationStarted() {
         SwingUtilities.invokeLater(() -> {
             statusLabel.setText("Generating maze...");
-            resetButton.setText("Stop");
+            pauseResumeButton.setText("Pause");
+            pauseResumeButton.setEnabled(true);
             updateControlsState(true, false);
         });
     }
@@ -405,7 +412,8 @@ public void saveWindowSettings() {
     public void onGenerationCompleted() {
         SwingUtilities.invokeLater(() -> {
             statusLabel.setText("Maze generation completed");
-            resetButton.setText("Reset");
+            pauseResumeButton.setText("Pause");
+            pauseResumeButton.setEnabled(false);
             updateControlsState(false, false);
         });
     }
@@ -414,7 +422,8 @@ public void saveWindowSettings() {
     public void onSolvingStarted() {
         SwingUtilities.invokeLater(() -> {
             statusLabel.setText("Solving maze...");
-            resetButton.setText("Stop");
+            pauseResumeButton.setText("Pause");
+            pauseResumeButton.setEnabled(true);
             updateControlsState(false, true);
         });
     }
@@ -423,14 +432,45 @@ public void saveWindowSettings() {
     public void onSolvingCompleted(boolean solved) {
         SwingUtilities.invokeLater(() -> {
             statusLabel.setText(solved ? "Maze solved!" : "No solution found");
-            resetButton.setText("Reset");
+            pauseResumeButton.setText("Pause");
+            pauseResumeButton.setEnabled(false);
             updateControlsState(false, false);
         });
     }
     
     @Override
     public void onPathFound(List<Point> path) {
-        SwingUtilities.invokeLater(() -> statusLabel.setText("Solution found! Path length: " + path.size()) );
+        SwingUtilities.invokeLater(() -> statusLabel.setText("Solution found! Path length: " + path.size()));
+    }
+    
+    @Override
+    public void onOperationPaused() {
+        SwingUtilities.invokeLater(() -> {
+            pauseResumeButton.setText("Resume");
+            if (controller.isGenerating()) {
+                statusLabel.setText("Maze generation paused");
+            } else if (controller.isSolving()) {
+                statusLabel.setText("Maze solving paused");
+            }
+            
+            // Update controls state to enable reset button during pause
+            updateControlsState(controller.isGenerating(), controller.isSolving());
+        });
+    }
+    
+    @Override
+    public void onOperationResumed() {
+        SwingUtilities.invokeLater(() -> {
+            pauseResumeButton.setText("Pause");
+            if (controller.isGenerating()) {
+                statusLabel.setText("Generating maze...");
+            } else if (controller.isSolving()) {
+                statusLabel.setText("Solving maze...");
+            }
+            
+            // Update controls state to disable reset button during active operation
+            updateControlsState(controller.isGenerating(), controller.isSolving());
+        });
     }
     
     @Override
@@ -492,18 +532,21 @@ public void saveWindowSettings() {
     
     @Override
     public void setSelectedGenerationAlgorithm(String algorithm) {
-        SwingUtilities.invokeLater(() -> generationAlgorithmBox.setSelectedItem(algorithm) );
+        SwingUtilities.invokeLater(() -> generationAlgorithmBox.setSelectedItem(algorithm));
     }
     
     @Override
     public void setSelectedSolvingAlgorithm(String algorithm) {
-        SwingUtilities.invokeLater(() -> solvingAlgorithmBox.setSelectedItem(algorithm) );
+        SwingUtilities.invokeLater(() -> solvingAlgorithmBox.setSelectedItem(algorithm));
     }
     
     @Override
     public void updateControlsState(boolean isGenerating, boolean isSolving) {
         SwingUtilities.invokeLater(() -> {
             boolean isBusy = isGenerating || isSolving;
+            boolean isGenerationPaused = controller.isGenerationPaused();
+            boolean isSolvingPaused = controller.isSolvingPaused();
+            boolean isAnyPaused = isGenerationPaused || isSolvingPaused;
             
             newMazeButton.setEnabled(!isBusy);
             generateButton.setEnabled(!isBusy);
@@ -517,7 +560,38 @@ public void saveWindowSettings() {
             rowsField.setEnabled(!isBusy);
             columnsField.setEnabled(!isBusy);
             
-            resetButton.setText(isBusy ? "Stop" : "Reset");
+            // Reset button logic based on new requirements:
+            // - Disabled during running operations
+            // - Enabled during paused states
+            // - Enabled when idle with maze
+            boolean resetEnabled = false;
+            if (controller.getMaze() != null) {
+                if (!isBusy) {
+                    // Idle state - always enabled
+                    resetEnabled = true;
+                } else if (isAnyPaused) {
+                    // Paused state - enabled
+                    resetEnabled = true;
+                } else {
+                    // Running state - disabled
+                    resetEnabled = false;
+                }
+            }
+            resetButton.setEnabled(resetEnabled);
+            
+            // Pause button is enabled only when busy
+            pauseResumeButton.setEnabled(isBusy);
+            
+            // Update pause button text based on pause state
+            if (isBusy) {
+                if (isAnyPaused) {
+                    pauseResumeButton.setText("Resume");
+                } else {
+                    pauseResumeButton.setText("Pause");
+                }
+            } else {
+                pauseResumeButton.setText("Pause");
+            }
         });
     }
     
@@ -580,13 +654,27 @@ public void saveWindowSettings() {
             controller.generateMaze();
         } else if (source == solveButton) {
             controller.solveMaze();
+        } else if (source == pauseResumeButton) {
+            controller.pauseResumeCurrentOperation();
         } else if (source == resetButton) {
-            if (controller.isBusy()) {
-                controller.stopCurrentOperation();
-                statusLabel.setText("Operation stopped");
+            boolean wasGenerationPaused = controller.isGenerating() && controller.isGenerationPaused();
+            boolean wasSolvingPaused = controller.isSolving() && controller.isSolvingPaused();
+            
+            if (wasGenerationPaused) {
+                statusLabel.setText("Stopping paused generation and resetting to blank maze...");
+            } else if (wasSolvingPaused) {
+                statusLabel.setText("Resetting maze to blank state...");
+            } else if (controller.isBusy()) {
+                // This shouldn't happen now since reset is disabled during running operations
+                statusLabel.setText("Resetting maze...");
+            }
+            
+            controller.resetMaze();
+            
+            if (wasGenerationPaused) {
+                statusLabel.setText("Maze reset - ready for new generation");
             } else {
-                controller.resetMaze();
-                statusLabel.setText("Maze reset");
+                statusLabel.setText("Maze reset to blank state");
             }
         } else if (source == saveButton) {
             controller.saveMaze();

@@ -71,6 +71,20 @@ public interface MazeView {
     void onPathFound(List<Point> path);
     
     // =========================
+    // Pause/Resume Event Methods
+    // =========================
+    
+    /**
+     * Called when an operation (generation or solving) is paused
+     */
+    void onOperationPaused();
+    
+    /**
+     * Called when an operation (generation or solving) is resumed
+     */
+    void onOperationResumed();
+    
+    // =========================
     // User Interaction Methods
     // =========================
     

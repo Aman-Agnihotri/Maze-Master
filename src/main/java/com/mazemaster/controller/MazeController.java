@@ -29,8 +29,13 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     // State management
     private volatile boolean isGenerating = false;
     private volatile boolean isSolving = false;
+    private volatile boolean isGenerationPaused = false;
+    private volatile boolean isSolvingPaused = false;
+    
     private final AtomicBoolean stopGeneration = new AtomicBoolean(false);
     private final AtomicBoolean stopSolving = new AtomicBoolean(false);
+    private final AtomicBoolean pauseGeneration = new AtomicBoolean(false);
+    private final AtomicBoolean pauseSolving = new AtomicBoolean(false);
     
     // Threading
     private Thread generationThread;
@@ -85,7 +90,9 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         }
         
         isGenerating = true;
+        isGenerationPaused = false;
         stopGeneration.set(false);
+        pauseGeneration.set(false);
         
         generationThread = new Thread(() -> {
             try {
@@ -93,12 +100,13 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                     view.onGenerationStarted();
                 }
                 
-                generator.generate(maze, currentGenerationAlgorithm, stopGeneration);
+                generator.generate(maze, currentGenerationAlgorithm, stopGeneration, pauseGeneration);
                 
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
                 isGenerating = false;
+                isGenerationPaused = false;
                 if (view != null && !stopGeneration.get()) {
                     view.onGenerationCompleted();
                 }
@@ -114,7 +122,9 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         }
         
         isSolving = true;
+        isSolvingPaused = false;
         stopSolving.set(false);
+        pauseSolving.set(false);
         
         solvingThread = new Thread(() -> {
             try {
@@ -122,7 +132,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                     view.onSolvingStarted();
                 }
                 
-                boolean solved = solver.solve(maze, currentSolvingAlgorithm, stopSolving);
+                boolean solved = solver.solve(maze, currentSolvingAlgorithm, stopSolving, pauseSolving);
                 
                 if (view != null && !stopSolving.get()) {
                     view.onSolvingCompleted(solved);
@@ -132,15 +142,74 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                 e.printStackTrace();
             } finally {
                 isSolving = false;
+                isSolvingPaused = false;
             }
         });
         
         solvingThread.start();
     }
     
+    public void pauseResumeCurrentOperation() {
+        if (isGenerating) {
+            if (isGenerationPaused) {
+                resumeGeneration();
+            } else {
+                pauseGeneration();
+            }
+        } else if (isSolving) {
+            if (isSolvingPaused) {
+                resumeSolving();
+            } else {
+                pauseSolving();
+            }
+        }
+    }
+    
+    private void pauseGeneration() {
+        if (isGenerating && !isGenerationPaused) {
+            isGenerationPaused = true;
+            pauseGeneration.set(true);
+            if (view != null) {
+                view.onOperationPaused();
+            }
+        }
+    }
+    
+    private void resumeGeneration() {
+        if (isGenerating && isGenerationPaused) {
+            isGenerationPaused = false;
+            pauseGeneration.set(false);
+            if (view != null) {
+                view.onOperationResumed();
+            }
+        }
+    }
+    
+    private void pauseSolving() {
+        if (isSolving && !isSolvingPaused) {
+            isSolvingPaused = true;
+            pauseSolving.set(true);
+            if (view != null) {
+                view.onOperationPaused();
+            }
+        }
+    }
+    
+    private void resumeSolving() {
+        if (isSolving && isSolvingPaused) {
+            isSolvingPaused = false;
+            pauseSolving.set(false);
+            if (view != null) {
+                view.onOperationResumed();
+            }
+        }
+    }
+    
     public void stopCurrentOperation() {
         if (isGenerating) {
             stopGeneration.set(true);
+            pauseGeneration.set(false);
+            isGenerationPaused = false;
             if (generationThread != null) {
                 try {
                     generationThread.join(1000); // Wait up to 1 second
@@ -152,6 +221,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         
         if (isSolving) {
             stopSolving.set(true);
+            pauseSolving.set(false);
+            isSolvingPaused = false;
             if (solvingThread != null) {
                 try {
                     solvingThread.join(1000); // Wait up to 1 second
@@ -163,9 +234,33 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     }
     
     public void resetMaze() {
-        stopAllOperations();
+        // If operations are running (including paused), we need to stop them completely
+        if (isGenerating || isSolving) {
+            stopAllOperations();
+        }
         
         if (maze != null) {
+            // Reset to completely blank state (like new maze functionality)
+            maze.reset(); // This makes it completely blank, not just clears solution
+            if (view != null) {
+                view.updateMaze(maze);
+                view.refresh();
+                
+                // Special case: if we were in generation paused state, 
+                // update UI as if we created a new maze (all buttons active)
+                view.updateControlsState(false, false);
+            }
+        }
+    }
+    
+    public void clearSolutionOnly() {
+        // This method only clears the solution, keeping the generated maze structure
+        if (maze != null) {
+            // If operations are running, stop them first
+            if (isGenerating || isSolving) {
+                stopAllOperations();
+            }
+            
             maze.resetSolution();
             if (view != null) {
                 view.updateMaze(maze);
@@ -250,6 +345,9 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     public boolean isGenerating() { return isGenerating; }
     public boolean isSolving() { return isSolving; }
     public boolean isBusy() { return isGenerating || isSolving; }
+    public boolean isGenerationPaused() { return isGenerationPaused; }
+    public boolean isSolvingPaused() { return isSolvingPaused; }
+    public boolean isAnyOperationPaused() { return isGenerationPaused || isSolvingPaused; }
     
     public Maze getMaze() { return maze; }
     public String getCurrentGenerationAlgorithm() { return currentGenerationAlgorithm; }
@@ -327,6 +425,11 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     // =========================
     
     private void stopAllOperations() {
+        // First, clear pause flags to allow threads to continue and check stop flags
+        pauseGeneration.set(false);
+        pauseSolving.set(false);
+        
+        // Then set stop flags
         stopGeneration.set(true);
         stopSolving.set(true);
         
@@ -347,8 +450,11 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             }
         }
         
+        // Reset all state flags
         isGenerating = false;
         isSolving = false;
+        isGenerationPaused = false;
+        isSolvingPaused = false;
     }
     
     // =========================
