@@ -13,13 +13,19 @@
 
 - 🏗️ **Multiple Generation Algorithms**
   - Depth-First Search (Recursive Backtracking)
-  - Kruskal's Algorithm (Coming Soon)
-  - Prim's Algorithm (Coming Soon)
+  - Kruskal's Algorithm (MST-based generation)
+  - Prim's Algorithm (Randomized frontier selection)
 
 - 🧭 **Advanced Solving Algorithms**
   - Depth-First Search (Recursive exploration)
   - Breadth-First Search (Guaranteed shortest path)
   - A* Search (Heuristic-based optimal pathfinding)
+
+- ⏯️ **Pause/Resume Functionality**
+  - Pause any running operation (generation or solving) at any time
+  - Resume exactly from the paused state
+  - Independent pause/resume controls for different operations
+  - Real-time status updates during pause/resume cycles
 
 - 🎨 **Rich Visualization & User Experience**
   - Real-time generation and solving animation
@@ -28,6 +34,13 @@
   - Color-coded cell states for clear visualization
   - Modern responsive UI with progress feedback
   - Window size and position persistence
+
+- 🎛️ **Smart Reset Controls**
+  - Context-aware reset button behavior
+  - **Generated maze**: Reset clears solution only (preserves maze structure)
+  - **Blank/partial maze**: Reset clears to completely blank state
+  - **Generation paused**: Reset stops and clears to blank (fresh start)
+  - **Solving paused**: Reset clears solution only (preserves maze)
 
 - 💾 **Advanced File Operations**
   - Save/Load maze states (serialized format)
@@ -38,7 +51,7 @@
 - 🎛️ **Enhanced User Controls**
   - Customizable maze dimensions (5x5 to 200x200)
   - Algorithm selection with dropdown menus
-  - Smart Start/Stop/Reset operations
+  - Smart operation controls (Generate/Solve/Pause/Reset)
   - Real-time status updates and feedback
   - Keyboard shortcuts and tooltips
 
@@ -119,26 +132,39 @@
 2. **Set Dimensions**: Enter desired maze size in the side panel
 3. **Choose Generation Algorithm**: Select from dropdown (default: DFS)
 4. **Generate Maze**: Click "Generate" and watch real-time creation
-5. **Select Solving Algorithm**: Choose pathfinding method
-6. **Solve Maze**: Click "Solve" to watch the algorithm work
-7. **Adjust Settings**: Use speed slider and zoom controls
-8. **Save/Export**: Preserve your maze or export as image
+5. **Pause/Resume**: Use "Pause" button to pause generation at any time
+6. **Select Solving Algorithm**: Choose pathfinding method
+7. **Solve Maze**: Click "Solve" to watch the algorithm work
+8. **Adjust Settings**: Use speed slider and zoom controls
+9. **Save/Export**: Preserve your maze or export as image
 
 ### Advanced Controls
 
 - **Mouse Wheel**: Zoom in/out (zoom level persists)
-- **Reset Button**: Clears solution while keeping generated maze
+- **Pause/Resume Button**: Pause any operation and resume from exact same state
+- **Reset Button**: Context-aware reset (clears solution or resets to blank)
 - **New Maze Button**: Creates entirely new maze with current dimensions
-- **Stop Operation**: Interrupts generation/solving in progress
 - **Speed Slider**: Real-time animation speed control (persists)
 - **Window Management**: Resize, move, maximize - all settings persist
 
-### Smart Behaviors
+### Smart Reset Button Behavior
 
-- **Persistent Settings**: All preferences automatically saved and restored
-- **Intelligent Reset**: Reset clears both exploration path and final solution
-- **Responsive UI**: Operations run on background threads
-- **Error Handling**: Comprehensive user feedback for all operations
+| Maze State | Reset Action |
+|------------|--------------|
+| **Idle with generated maze** | Clears solution only (preserves maze structure) |
+| **Idle with blank maze** | No change (already blank) |
+| **Generation paused** | Stops generation → resets to blank (fresh start) |
+| **Solving paused** | Clears solution only (preserves generated maze) |
+| **Generation running** | Button disabled (must pause first) |
+| **Solving running** | Button disabled (must pause first) |
+
+### Pause/Resume Functionality
+
+- **During Generation**: Pause mid-generation, resume exactly where left off
+- **During Solving**: Pause mid-solving, resume with same exploration state
+- **Real-time Response**: Operations pause immediately when button clicked
+- **State Preservation**: All progress maintained during pause
+- **Status Updates**: Clear feedback on current operation state
 
 ## 🏗️ Architecture
 
@@ -171,6 +197,7 @@ src/main/java/com/mazemaster/
 - **MVC (Model-View-Controller)**: Clean separation of data, logic, and presentation
 - **Strategy Pattern**: Pluggable algorithms for generation and solving
 - **Observer Pattern**: Event-driven UI updates and progress notifications
+- **State Pattern**: Pause/resume state management
 - **Interface Segregation**: Clean contracts between components
 - **Dependency Injection**: Loose coupling through constructor injection
 - **Command Pattern**: Encapsulated user actions and operations
@@ -181,7 +208,8 @@ src/main/java/com/mazemaster/
 - **Extensibility**: Easy to add new algorithms without changing existing code
 - **Testability**: Interface-based design enables comprehensive unit testing
 - **Performance**: Optimized rendering with viewport clipping
-- **Thread Safety**: Proper concurrent operation handling
+- **Thread Safety**: Proper concurrent operation handling with pause support
+- **User Experience**: Responsive UI with non-blocking operations
 
 ## 🧮 Algorithms
 
@@ -193,8 +221,20 @@ src/main/java/com/mazemaster/
 - **Space Complexity**: O(n) for recursion stack
 - **Characteristics**: Creates mazes with long, winding corridors
 - **Implementation**: Randomized wall removal with connectivity tracking
-<!-- markdownlint-disable-next-line MD036 -->
-*Future algorithms: Kruskal's MST-based generation, Prim's algorithm*
+
+#### Kruskal's Algorithm
+
+- **Time Complexity**: O(E log E) where E is number of edges
+- **Space Complexity**: O(V) for Union-Find structure
+- **Characteristics**: Creates mazes with more branching paths
+- **Implementation**: Minimum spanning tree approach with Union-Find
+
+#### Prim's Algorithm
+
+- **Time Complexity**: O(E log V) where V=vertices, E=edges
+- **Space Complexity**: O(V) for frontier management
+- **Characteristics**: Creates mazes with organic, tree-like structure
+- **Implementation**: Randomized frontier selection and wall removal
 
 ### Solving Algorithms
 
@@ -228,10 +268,12 @@ src/main/java/com/mazemaster/
 ```java
 public class MyGenerationAlgorithm implements MazeGenerationStrategy {
     @Override
-    public void generate(Maze maze, MazeGenerationListener listener, AtomicBoolean stopFlag) {
+    public void generate(Maze maze, MazeGenerationListener listener, 
+                        AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
         // Your algorithm implementation
         // Use listener.onCellChanged() for real-time updates
         // Check stopFlag.get() for cancellation
+        // Check pauseFlag.get() for pause state
     }
 }
 ```
@@ -250,9 +292,11 @@ strategies.put("My Algorithm", new MyGenerationAlgorithm());
 ```java
 public class MySolvingAlgorithm implements MazeSolvingStrategy {
     @Override
-    public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag) {
+    public boolean solve(Maze maze, MazeSolvingListener listener, 
+                        AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
         // Your pathfinding implementation
         // Return true if solution found
+        // Handle pause/resume logic
     }
 }
 ```
@@ -342,8 +386,30 @@ maze-master/
 - **Viewport Clipping**: Only renders visible maze cells
 - **Efficient Rendering**: Optimized Graphics2D usage with anti-aliasing
 - **Background Threading**: Non-blocking UI during long operations
+- **Pause-Aware Operations**: Minimal overhead during pause states
 - **Memory Management**: Defensive copying and garbage collection friendly
 - **JVM Tuning**: Optimized JVM arguments for Swing applications
+
+## 🔧 Advanced Features
+
+### Pause/Resume Implementation
+
+- **Thread-Safe**: Uses AtomicBoolean flags for thread-safe pause control
+- **State Preservation**: Maintains complete algorithm state during pause
+- **Responsive**: Immediate pause response with 100ms check intervals
+- **Memory Efficient**: No additional memory overhead during pause
+
+### Context-Aware Reset
+
+- **Intelligent Behavior**: Different reset actions based on current maze state
+- **User-Friendly**: Prevents accidental loss of generated mazes
+- **Status Feedback**: Clear messages indicating reset action taken
+
+### Window State Persistence
+
+- **Complete State**: Saves position, size, maximized state, zoom level
+- **Cross-Session**: Settings preserved between application restarts
+- **User Preferences**: Animation speed and UI preferences maintained
 
 ## 📄 License
 
@@ -356,11 +422,24 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - **UI Framework**: Java Swing for robust cross-platform desktop applications
 - **Build System**: Gradle for modern dependency management and build automation
 - **Testing**: JUnit 5 ecosystem for comprehensive test coverage
+- **Concurrency**: Java threading model for responsive pause/resume functionality
 
 ## 🔗 Links
 
 - **Documentation**: [Gradle User Guide](https://docs.gradle.org/current/userguide/userguide.html)
 - **Java**: [OpenJDK 17 Documentation](https://docs.oracle.com/en/java/javase/17/)
 - **Swing**: [Java Swing Tutorial](https://docs.oracle.com/javase/tutorial/uiswing/)
+- **Threading**: [Java Concurrency Guide](https://docs.oracle.com/javase/tutorial/essential/concurrency/)
 
 ---
+
+## 🆕 Recent Updates
+
+### Version 2.0.0 - Pause/Resume & Smart Controls
+
+- ✅ **Pause/Resume Functionality**: Pause any operation and resume from exact state
+- ✅ **Context-Aware Reset**: Smart reset behavior based on maze state
+- ✅ **All Generation Algorithms**: DFS, Kruskal's, and Prim's algorithms implemented
+- ✅ **Enhanced UI**: Improved button states and user feedback
+- ✅ **Code Quality**: Refactored for reduced cognitive complexity
+- ✅ **Thread Safety**: Robust concurrent operation handling
