@@ -196,7 +196,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         generateButton = createButton("Generate", "Generate a new maze using selected algorithm");
         solveButton = createButton("Solve", "Solve the current maze");
         pauseResumeButton = createButton("Pause", "Pause or resume current operation");
-        resetButton = createButton("Reset", "Reset maze to blank state (only available when paused or idle)");
+        resetButton = createButton("Reset", "Context-aware reset: clears solution if maze is generated, or resets to blank if not");
         
         // Initially disable pause button
         pauseResumeButton.setEnabled(false);
@@ -659,20 +659,22 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         } else if (source == resetButton) {
             boolean wasGenerationPaused = controller.isGenerating() && controller.isGenerationPaused();
             boolean wasSolvingPaused = controller.isSolving() && controller.isSolvingPaused();
+            boolean isMazeGenerated = controller.isMazeFullyGenerated();
             
             if (wasGenerationPaused) {
                 statusLabel.setText("Stopping paused generation and resetting to blank maze...");
-            } else if (wasSolvingPaused) {
-                statusLabel.setText("Resetting maze to blank state...");
-            } else if (controller.isBusy()) {
-                // This shouldn't happen now since reset is disabled during running operations
-                statusLabel.setText("Resetting maze...");
+            } else if (wasSolvingPaused || (!controller.isBusy() && isMazeGenerated)) {
+                statusLabel.setText("Clearing solution and keeping generated maze...");
+            } else {
+                statusLabel.setText("Resetting to blank maze...");
             }
             
             controller.resetMaze();
             
             if (wasGenerationPaused) {
                 statusLabel.setText("Maze reset - ready for new generation");
+            } else if (wasSolvingPaused || (!controller.isBusy() && isMazeGenerated)) {
+                statusLabel.setText("Solution cleared - maze ready for solving");
             } else {
                 statusLabel.setText("Maze reset to blank state");
             }

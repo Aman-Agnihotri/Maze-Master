@@ -234,23 +234,52 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     }
     
     public void resetMaze() {
+        boolean wasGenerationPaused = isGenerating && isGenerationPaused;
+        boolean wasSolvingPaused = isSolving && isSolvingPaused;
+        
         // If operations are running (including paused), we need to stop them completely
         if (isGenerating || isSolving) {
             stopAllOperations();
         }
         
         if (maze != null) {
-            // Reset to completely blank state (like new maze functionality)
-            maze.reset(); // This makes it completely blank, not just clears solution
-            if (view != null) {
-                view.updateMaze(maze);
-                view.refresh();
-                
-                // Special case: if we were in generation paused state, 
-                // update UI as if we created a new maze (all buttons active)
-                view.updateControlsState(false, false);
+            if (wasSolvingPaused || isMazeFullyGenerated()) {
+                // Solving paused OR maze is fully generated: Just clear the solution, keep the generated maze
+                maze.resetSolution(); // This keeps the maze structure, clears only the solution
+                if (view != null) {
+                    view.updateMaze(maze);
+                    view.refresh();
+                    // Update UI normally (maze exists, ready for solving again)
+                    view.updateControlsState(false, false);
+                }
+            } else if (wasGenerationPaused) {
+                // Generation paused OR normal case (idle with incomplete/blank maze): Reset to completely blank state
+                maze.reset(); // This makes it completely blank
+                if (view != null) {
+                    view.updateMaze(maze);
+                    view.refresh();
+                    // Update UI as if we created a new maze (all buttons active)
+                    view.updateControlsState(false, false);
+                }
             }
         }
+    }
+    
+    public boolean isMazeFullyGenerated() {
+        if (maze == null) return false;
+        
+        // Check if there are any empty cells (indicating the maze has been generated)
+        // A fully generated maze will have paths (empty cells) between walls
+        for (int i = 0; i < maze.getRows(); i++) {
+            for (int j = 0; j < maze.getColumns(); j++) {
+                int cellValue = maze.getCell(i, j);
+                if (cellValue == Maze.EMPTY || cellValue == Maze.PATH || 
+                    cellValue == Maze.VISITED || cellValue == Maze.START) {
+                    return true; // Found at least one non-wall cell, maze is generated
+                }
+            }
+        }
+        return false; // All cells are walls, maze is not generated
     }
     
     public void clearSolutionOnly() {
