@@ -43,6 +43,21 @@ public class MazeGenerator {
     }
     
     /**
+     * Helper class to encapsulate maze generation context and reduce parameter count
+     */
+    private static class MazeGenerationContext {
+        final MazeGenerationListener listener;
+        final AtomicBoolean stopFlag;
+        final AtomicBoolean pauseFlag;
+        
+        MazeGenerationContext(MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
+            this.listener = listener;
+            this.stopFlag = stopFlag;
+            this.pauseFlag = pauseFlag;
+        }
+    }
+    
+    /**
      * Utility method to handle pause checking during animation delays
      */
     private void waitForResume(AtomicBoolean pauseFlag) {
@@ -95,7 +110,7 @@ public class MazeGenerator {
             processWalls(maze, walls, listener, stopFlag, pauseFlag);
             if (stopFlag.get()) return;
             
-            convertRoomNumbersToEmptyCells(maze, rows, cols, listener, stopFlag, pauseFlag);
+            convertRoomNumbersToEmptyCells(maze, rows, cols, listener);
             
             if (listener != null && !stopFlag.get()) {
                 listener.onGenerationComplete();
@@ -160,11 +175,9 @@ public class MazeGenerator {
             }
         }
         
-        private void convertRoomNumbersToEmptyCells(Maze maze, int rows, int cols, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
+        private void convertRoomNumbersToEmptyCells(Maze maze, int rows, int cols, MazeGenerationListener listener) {
             for (int i = 1; i < rows - 1; i++) {
                 for (int j = 1; j < cols - 1; j++) {
-                    if (stopFlag.get()) return;
-                    
                     if (maze.getCell(i, j) < 0) {
                         maze.setCell(i, j, Maze.EMPTY);
                         if (listener != null) {
@@ -399,7 +412,9 @@ public class MazeGenerator {
             int startRow = 1 + (random.nextInt((rows - 2) / 2)) * 2;
             int startCol = 1 + (random.nextInt((cols - 2) / 2)) * 2;
             
-            addCellToMaze(maze, inMaze, startRow, startCol, frontierWalls, listener, stopFlag, pauseFlag);
+            MazeGenerationContext context = new MazeGenerationContext(listener, stopFlag, pauseFlag);
+            
+            addCellToMaze(maze, inMaze, startRow, startCol, frontierWalls, context);
             
             // Process frontier walls until maze is complete
             while (!frontierWalls.isEmpty() && !stopFlag.get()) {
@@ -410,7 +425,7 @@ public class MazeGenerator {
                 
                 // Check if we can remove this wall
                 if (canRemoveWall(inMaze, wall)) {
-                    removeWall(maze, inMaze, wall, frontierWalls, listener, stopFlag, pauseFlag);
+                    removeWall(maze, inMaze, wall, frontierWalls, context);
                 }
             }
             
@@ -419,22 +434,23 @@ public class MazeGenerator {
             }
         }
         
-        private void addCellToMaze(Maze maze, boolean[][] inMaze, int row, int col, List<Wall> frontierWalls, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
-            if (stopFlag.get()) return;
+        private void addCellToMaze(Maze maze, boolean[][] inMaze, int row, int col, 
+                                List<Wall> frontierWalls, MazeGenerationContext context) {
+            if (context.stopFlag.get()) return;
             
             // Mark cell as part of maze
             maze.setCell(row, col, Maze.EMPTY);
             inMaze[row][col] = true;
             
-            if (listener != null) {
-                listener.onCellChanged(row, col, Maze.EMPTY);
-                listener.onGenerationStep();
+            if (context.listener != null) {
+                context.listener.onCellChanged(row, col, Maze.EMPTY);
+                context.listener.onGenerationStep();
             }
             
             // Add walls around this cell to frontier
             addSurroundingWalls(row, col, frontierWalls, inMaze, maze.getRows(), maze.getColumns());
             
-            pauseAwareSleep(delayMs / 4, stopFlag, pauseFlag);
+            pauseAwareSleep(delayMs / 4, context.stopFlag, context.pauseFlag);
         }
         
         private void addSurroundingWalls(int row, int col, List<Wall> frontierWalls, boolean[][] inMaze, int rows, int cols) {
@@ -471,8 +487,8 @@ public class MazeGenerator {
             return room1InMaze != room2InMaze; // XOR - exactly one should be true
         }
         
-        private void removeWall(Maze maze, boolean[][] inMaze, Wall wall, List<Wall> frontierWalls, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
-            if (stopFlag.get()) return;
+        private void removeWall(Maze maze, boolean[][] inMaze, Wall wall, List<Wall> frontierWalls, MazeGenerationContext context) {
+            if (context.stopFlag.get()) return;
             
             // Remove the wall
             maze.setCell(wall.row, wall.col, Maze.EMPTY);
@@ -481,14 +497,14 @@ public class MazeGenerator {
             int newCellRow = inMaze[wall.room1Row][wall.room1Col] ? wall.room2Row : wall.room1Row;
             int newCellCol = inMaze[wall.room1Row][wall.room1Col] ? wall.room2Col : wall.room1Col;
             
-            addCellToMaze(maze, inMaze, newCellRow, newCellCol, frontierWalls, listener, stopFlag, pauseFlag);
+            addCellToMaze(maze, inMaze, newCellRow, newCellCol, frontierWalls, context);
             
-            if (listener != null) {
-                listener.onCellChanged(wall.row, wall.col, Maze.EMPTY);
-                listener.onGenerationStep();
+            if (context.listener != null) {
+                context.listener.onCellChanged(wall.row, wall.col, Maze.EMPTY);
+                context.listener.onGenerationStep();
             }
             
-            pauseAwareSleep(delayMs, stopFlag, pauseFlag);
+            pauseAwareSleep(delayMs, context.stopFlag, context.pauseFlag);
         }
     }
     
