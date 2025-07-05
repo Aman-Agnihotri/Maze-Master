@@ -27,7 +27,7 @@ import java.awt.event.ComponentEvent;
  */
 public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     
-    private transient final MazeController controller;
+    private final transient MazeController controller;
     
     // UI Components
     private MazePanel mazePanel;
@@ -430,9 +430,7 @@ public void saveWindowSettings() {
     
     @Override
     public void onPathFound(List<Point> path) {
-        SwingUtilities.invokeLater(() -> {
-            statusLabel.setText("Solution found! Path length: " + path.size());
-        });
+        SwingUtilities.invokeLater(() -> statusLabel.setText("Solution found! Path length: " + path.size()) );
     }
     
     @Override
@@ -494,16 +492,12 @@ public void saveWindowSettings() {
     
     @Override
     public void setSelectedGenerationAlgorithm(String algorithm) {
-        SwingUtilities.invokeLater(() -> {
-            generationAlgorithmBox.setSelectedItem(algorithm);
-        });
+        SwingUtilities.invokeLater(() -> generationAlgorithmBox.setSelectedItem(algorithm) );
     }
     
     @Override
     public void setSelectedSolvingAlgorithm(String algorithm) {
-        SwingUtilities.invokeLater(() -> {
-            solvingAlgorithmBox.setSelectedItem(algorithm);
-        });
+        SwingUtilities.invokeLater(() -> solvingAlgorithmBox.setSelectedItem(algorithm) );
     }
     
     @Override
