@@ -97,7 +97,7 @@ public interface MazeView {
     
     /**
      * Get user input for maze dimensions
-     * @return An array with [rows, columns] or null if cancelled
+     * @return An array with [rows, columns] or empty array if cancelled/invalid
      */
     int[] getMazeDimensions();
     

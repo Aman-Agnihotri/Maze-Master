@@ -490,18 +490,18 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             
             if (rows < 5 || cols < 5) {
                 showMessage("Dimensions must be at least 5x5", true);
-                return null;
+                return new int[0];
             }
             
             if (rows > 200 || cols > 200) {
                 showMessage("Dimensions too large (max 200x200)", true);
-                return null;
+                return new int[0];
             }
             
             return new int[]{rows, cols};
         } catch (NumberFormatException e) {
             showMessage("Invalid dimensions. Please enter valid numbers.", true);
-            return null;
+            return new int[0];
         }
     }
     
@@ -646,7 +646,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         
         if (source == newMazeButton) {
             int[] dimensions = getMazeDimensions();
-            if (dimensions != null) {
+            if (dimensions.length == 2) { // Check for valid dimensions array
                 controller.createNewMaze(dimensions[0], dimensions[1]);
                 statusLabel.setText("New maze created");
             }
