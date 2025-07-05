@@ -490,18 +490,18 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             
             if (rows < 5 || cols < 5) {
                 showMessage("Dimensions must be at least 5x5", true);
-                return new int[0];
+                return new int[0]; // Return empty array instead of null
             }
             
             if (rows > 200 || cols > 200) {
                 showMessage("Dimensions too large (max 200x200)", true);
-                return new int[0];
+                return new int[0]; // Return empty array instead of null
             }
             
             return new int[]{rows, cols};
         } catch (NumberFormatException e) {
             showMessage("Invalid dimensions. Please enter valid numbers.", true);
-            return new int[0];
+            return new int[0]; // Return empty array instead of null
         }
     }
     
@@ -548,51 +548,54 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             boolean isSolvingPaused = controller.isSolvingPaused();
             boolean isAnyPaused = isGenerationPaused || isSolvingPaused;
             
-            newMazeButton.setEnabled(!isBusy);
-            generateButton.setEnabled(!isBusy);
-            solveButton.setEnabled(!isBusy && controller.getMaze() != null);
-            saveButton.setEnabled(!isBusy && controller.getMaze() != null);
-            loadButton.setEnabled(!isBusy);
-            exportButton.setEnabled(!isBusy && controller.getMaze() != null);
-            
-            generationAlgorithmBox.setEnabled(!isBusy);
-            solvingAlgorithmBox.setEnabled(!isBusy);
-            rowsField.setEnabled(!isBusy);
-            columnsField.setEnabled(!isBusy);
-            
-            // Reset button logic based on new requirements:
-            // - Disabled during running operations
-            // - Enabled during paused states
-            // - Enabled when idle with maze
-            boolean resetEnabled = false;
-            if (controller.getMaze() != null) {
-                if (!isBusy) {
-                    // Idle state - always enabled
-                    resetEnabled = true;
-                } else if (isAnyPaused) {
-                    // Paused state - enabled
-                    resetEnabled = true;
-                } else {
-                    // Running state - disabled
-                    resetEnabled = false;
-                }
-            }
-            resetButton.setEnabled(resetEnabled);
-            
-            // Pause button is enabled only when busy
-            pauseResumeButton.setEnabled(isBusy);
-            
-            // Update pause button text based on pause state
-            if (isBusy) {
-                if (isAnyPaused) {
-                    pauseResumeButton.setText("Resume");
-                } else {
-                    pauseResumeButton.setText("Pause");
-                }
-            } else {
-                pauseResumeButton.setText("Pause");
-            }
+            updateMainButtons(isBusy);
+            updateAlgorithmControls(isBusy);
+            updateResetButton();
+            updatePauseResumeButton(isBusy, isAnyPaused);
         });
+    }
+    
+    private void updateMainButtons(boolean isBusy) {
+        newMazeButton.setEnabled(!isBusy);
+        generateButton.setEnabled(!isBusy);
+        solveButton.setEnabled(!isBusy && controller.getMaze() != null);
+        saveButton.setEnabled(!isBusy && controller.getMaze() != null);
+        loadButton.setEnabled(!isBusy);
+        exportButton.setEnabled(!isBusy && controller.getMaze() != null);
+    }
+    
+    private void updateAlgorithmControls(boolean isBusy) {
+        generationAlgorithmBox.setEnabled(!isBusy);
+        solvingAlgorithmBox.setEnabled(!isBusy);
+        rowsField.setEnabled(!isBusy);
+        columnsField.setEnabled(!isBusy);
+    }
+    
+    private void updateResetButton() {
+        boolean resetEnabled = false;
+        if (controller.getMaze() != null) {
+            boolean isBusy = controller.isBusy();
+            boolean isAnyPaused = controller.isGenerationPaused() || controller.isSolvingPaused();
+
+            // Enable reset if not busy or if paused
+            if (!isBusy || isAnyPaused) {
+                resetEnabled = true;
+            }
+            // Running and not paused - disabled (resetEnabled remains false)
+        }
+        resetButton.setEnabled(resetEnabled);
+    }
+    
+    private void updatePauseResumeButton(boolean isBusy, boolean isAnyPaused) {
+        // Pause button is enabled only when busy
+        pauseResumeButton.setEnabled(isBusy);
+        
+        // Update pause button text based on pause state
+        if (isBusy) {
+            pauseResumeButton.setText(isAnyPaused ? "Resume" : "Pause");
+        } else {
+            pauseResumeButton.setText("Pause");
+        }
     }
     
     @Override
@@ -645,11 +648,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         Object source = e.getSource();
         
         if (source == newMazeButton) {
-            int[] dimensions = getMazeDimensions();
-            if (dimensions.length == 2) { // Check for valid dimensions array
-                controller.createNewMaze(dimensions[0], dimensions[1]);
-                statusLabel.setText("New maze created");
-            }
+            handleNewMazeAction();
         } else if (source == generateButton) {
             controller.generateMaze();
         } else if (source == solveButton) {
@@ -657,50 +656,80 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         } else if (source == pauseResumeButton) {
             controller.pauseResumeCurrentOperation();
         } else if (source == resetButton) {
-            boolean wasGenerationPaused = controller.isGenerating() && controller.isGenerationPaused();
-            boolean wasSolvingPaused = controller.isSolving() && controller.isSolvingPaused();
-            boolean isMazeGenerated = controller.isMazeFullyGenerated();
-            
-            if (wasGenerationPaused) {
-                statusLabel.setText("Stopping paused generation and resetting to blank maze...");
-            } else if (wasSolvingPaused || (!controller.isBusy() && isMazeGenerated)) {
-                statusLabel.setText("Clearing solution and keeping generated maze...");
-            } else {
-                statusLabel.setText("Resetting to blank maze...");
-            }
-            
-            controller.resetMaze();
-            
-            if (wasGenerationPaused) {
-                statusLabel.setText("Maze reset - ready for new generation");
-            } else if (wasSolvingPaused || (!controller.isBusy() && isMazeGenerated)) {
-                statusLabel.setText("Solution cleared - maze ready for solving");
-            } else {
-                statusLabel.setText("Maze reset to blank state");
-            }
+            handleResetAction();
         } else if (source == saveButton) {
             controller.saveMaze();
         } else if (source == loadButton) {
             controller.loadMaze();
         } else if (source == exportButton) {
-            String filename = getExportFilename();
-            if (filename != null) {
-                if (exportToImage(filename)) {
-                    statusLabel.setText("Maze exported to " + filename);
-                } else {
-                    showMessage("Failed to export maze", true);
-                }
-            }
+            handleExportAction();
         } else if (source == generationAlgorithmBox) {
-            String selected = (String) generationAlgorithmBox.getSelectedItem();
-            if (selected != null) {
-                controller.setGenerationAlgorithm(selected);
-            }
+            handleGenerationAlgorithmChange();
         } else if (source == solvingAlgorithmBox) {
-            String selected = (String) solvingAlgorithmBox.getSelectedItem();
-            if (selected != null) {
-                controller.setSolvingAlgorithm(selected);
+            handleSolvingAlgorithmChange();
+        }
+    }
+    
+    private void handleNewMazeAction() {
+        int[] dimensions = getMazeDimensions();
+        if (dimensions.length == 2) {
+            controller.createNewMaze(dimensions[0], dimensions[1]);
+            statusLabel.setText("New maze created");
+        }
+    }
+    
+    private void handleResetAction() {
+        boolean wasGenerationPaused = controller.isGenerating() && controller.isGenerationPaused();
+        boolean wasSolvingPaused = controller.isSolving() && controller.isSolvingPaused();
+        boolean isMazeGenerated = controller.isMazeFullyGenerated();
+        
+        setResetStatusMessage(wasGenerationPaused, wasSolvingPaused, isMazeGenerated);
+        controller.resetMaze();
+        setResetCompletionMessage(wasGenerationPaused, wasSolvingPaused, isMazeGenerated);
+    }
+    
+    private void setResetStatusMessage(boolean wasGenerationPaused, boolean wasSolvingPaused, boolean isMazeGenerated) {
+        if (wasGenerationPaused) {
+            statusLabel.setText("Stopping paused generation and resetting to blank maze...");
+        } else if (wasSolvingPaused || (!controller.isBusy() && isMazeGenerated)) {
+            statusLabel.setText("Clearing solution and keeping generated maze...");
+        } else {
+            statusLabel.setText("Resetting to blank maze...");
+        }
+    }
+    
+    private void setResetCompletionMessage(boolean wasGenerationPaused, boolean wasSolvingPaused, boolean isMazeGenerated) {
+        if (wasGenerationPaused) {
+            statusLabel.setText("Maze reset - ready for new generation");
+        } else if (wasSolvingPaused || (!controller.isBusy() && isMazeGenerated)) {
+            statusLabel.setText("Solution cleared - maze ready for solving");
+        } else {
+            statusLabel.setText("Maze reset to blank state");
+        }
+    }
+    
+    private void handleExportAction() {
+        String filename = getExportFilename();
+        if (filename != null) {
+            if (exportToImage(filename)) {
+                statusLabel.setText("Maze exported to " + filename);
+            } else {
+                showMessage("Failed to export maze", true);
             }
+        }
+    }
+    
+    private void handleGenerationAlgorithmChange() {
+        String selected = (String) generationAlgorithmBox.getSelectedItem();
+        if (selected != null) {
+            controller.setGenerationAlgorithm(selected);
+        }
+    }
+    
+    private void handleSolvingAlgorithmChange() {
+        String selected = (String) solvingAlgorithmBox.getSelectedItem();
+        if (selected != null) {
+            controller.setSolvingAlgorithm(selected);
         }
     }
 }
