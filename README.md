@@ -150,7 +150,7 @@
 ### Smart Reset Button Behavior
 
 | Maze State | Reset Action |
-|------------|--------------|
+| ------------ | -------------- |
 | **Idle with generated maze** | Clears solution only (preserves maze structure) |
 | **Idle with blank maze** | No change (already blank) |
 | **Generation paused** | Stops generation → resets to blank (fresh start) |

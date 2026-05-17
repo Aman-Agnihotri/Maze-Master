@@ -10,7 +10,9 @@ import com.mazemaster.ui.MazeView;
 
 import java.awt.Point;
 import java.io.*;
+import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -45,6 +47,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     private String currentGenerationAlgorithm = "DFS";
     private String currentSolvingAlgorithm = "Depth First Search";
     private static final String SAVE_FILE_NAME = "mazeSave.ser";
+    private static final int MIN_MAZE_DIMENSION = 5;
+    private static final int MAX_MAZE_DIMENSION = 200;
     
     public MazeController() {
         this.generator = new MazeGenerator();
@@ -72,9 +76,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     public void createNewMaze(int rows, int columns) {
         stopAllOperations();
         
-        // Ensure odd dimensions for proper generation
-        if (rows % 2 == 0) rows++;
-        if (columns % 2 == 0) columns++;
+        rows = normalizeDimension(rows);
+        columns = normalizeDimension(columns);
         
         this.maze = new Maze(rows, columns);
         
@@ -104,12 +107,12 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                 
             } catch (Exception e) {
                 e.printStackTrace();
+                if (view != null) {
+                    view.showMessage("Error generating maze: " + e.getMessage(), true);
+                }
             } finally {
                 isGenerating = false;
                 isGenerationPaused = false;
-                if (view != null && !stopGeneration.get()) {
-                    view.onGenerationCompleted();
-                }
             }
         });
         
@@ -132,14 +135,14 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                     view.onSolvingStarted();
                 }
                 
-                boolean solved = solver.solve(maze, currentSolvingAlgorithm, stopSolving, pauseSolving);
-                
-                if (view != null && !stopSolving.get()) {
-                    view.onSolvingCompleted(solved);
-                }
+                solver.solve(maze, currentSolvingAlgorithm, stopSolving, pauseSolving);
+                // Completion is reported through MazeSolvingListener to keep lifecycle events centralized.
                 
             } catch (Exception e) {
                 e.printStackTrace();
+                if (view != null) {
+                    view.showMessage("Error solving maze: " + e.getMessage(), true);
+                }
             } finally {
                 isSolving = false;
                 isSolvingPaused = false;
@@ -243,22 +246,28 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         }
         
         if (maze != null) {
-            if (wasSolvingPaused || isMazeFullyGenerated()) {
-                // Solving paused OR maze is fully generated: Just clear the solution, keep the generated maze
-                maze.resetSolution(); // This keeps the maze structure, clears only the solution
+            if (wasGenerationPaused) {
+                // A paused generation leaves a partial maze. Reset to a blank structure for a clean start.
+                maze.reset();
                 if (view != null) {
                     view.updateMaze(maze);
                     view.refresh();
-                    // Update UI normally (maze exists, ready for solving again)
                     view.updateControlsState(false, false);
                 }
-            } else if (wasGenerationPaused) {
-                // Generation paused OR normal case (idle with incomplete/blank maze): Reset to completely blank state
-                maze.reset(); // This makes it completely blank
+            } else if (wasSolvingPaused || isMazeFullyGenerated()) {
+                // Solving paused OR maze is fully generated: clear only solver markings.
+                maze.resetSolution();
                 if (view != null) {
                     view.updateMaze(maze);
                     view.refresh();
-                    // Update UI as if we created a new maze (all buttons active)
+                    view.updateControlsState(false, false);
+                }
+            } else {
+                // Blank or incomplete idle maze: reset to all walls.
+                maze.reset();
+                if (view != null) {
+                    view.updateMaze(maze);
+                    view.refresh();
                     view.updateControlsState(false, false);
                 }
             }
@@ -267,19 +276,35 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     
     public boolean isMazeFullyGenerated() {
         if (maze == null) return false;
-        
-        // Check if there are any empty cells (indicating the maze has been generated)
-        // A fully generated maze will have paths (empty cells) between walls
-        for (int i = 0; i < maze.getRows(); i++) {
-            for (int j = 0; j < maze.getColumns(); j++) {
-                int cellValue = maze.getCell(i, j);
-                if (cellValue == Maze.EMPTY || cellValue == Maze.PATH || 
-                    cellValue == Maze.VISITED || cellValue == Maze.START) {
-                    return true; // Found at least one non-wall cell, maze is generated
+
+        if (!maze.isWalkable(maze.getStartRow(), maze.getStartCol()) ||
+            !maze.isWalkable(maze.getGoalRow(), maze.getGoalCol())) {
+            return false;
+        }
+
+        boolean[][] visited = new boolean[maze.getRows()][maze.getColumns()];
+        Queue<Point> queue = new ArrayDeque<>();
+        queue.offer(new Point(maze.getStartRow(), maze.getStartCol()));
+        visited[maze.getStartRow()][maze.getStartCol()] = true;
+
+        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        while (!queue.isEmpty()) {
+            Point current = queue.poll();
+            if (current.x == maze.getGoalRow() && current.y == maze.getGoalCol()) {
+                return true;
+            }
+
+            for (int[] direction : directions) {
+                int nextRow = current.x + direction[0];
+                int nextCol = current.y + direction[1];
+                if (maze.isWalkable(nextRow, nextCol) && !visited[nextRow][nextCol]) {
+                    visited[nextRow][nextCol] = true;
+                    queue.offer(new Point(nextRow, nextCol));
                 }
             }
         }
-        return false; // All cells are walls, maze is not generated
+
+        return false;
     }
     
     public void clearSolutionOnly() {
@@ -410,6 +435,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     
     @Override
     public void onGenerationComplete() {
+        isGenerating = false;
+        isGenerationPaused = false;
         if (view != null) {
             view.onGenerationCompleted();
         }
@@ -444,6 +471,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     
     @Override
     public void onSolvingComplete(boolean solved) {
+        isSolving = false;
+        isSolvingPaused = false;
         if (view != null) {
             view.onSolvingCompleted(solved);
         }
@@ -484,6 +513,14 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         isSolving = false;
         isGenerationPaused = false;
         isSolvingPaused = false;
+    }
+
+    private int normalizeDimension(int dimension) {
+        int normalized = Math.max(MIN_MAZE_DIMENSION, Math.min(MAX_MAZE_DIMENSION, dimension));
+        if (normalized % 2 == 0) {
+            normalized = normalized == MAX_MAZE_DIMENSION ? normalized - 1 : normalized + 1;
+        }
+        return normalized;
     }
     
     // =========================

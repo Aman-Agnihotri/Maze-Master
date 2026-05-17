@@ -40,6 +40,9 @@ public class MazeGenerator {
         
         maze.reset();
         strategy.generate(maze, listener, stopFlag, pauseFlag);
+        if (listener != null && !stopFlag.get()) {
+            listener.onGenerationComplete();
+        }
     }
     
     /**
@@ -112,9 +115,6 @@ public class MazeGenerator {
             
             convertRoomNumbersToEmptyCells(maze, rows, cols, listener);
             
-            if (listener != null && !stopFlag.get()) {
-                listener.onGenerationComplete();
-            }
         }
         
         private int ensureOddDimension(int dimension) {
@@ -267,9 +267,6 @@ public class MazeGenerator {
             // Process walls using Kruskal's algorithm
             processWallsKruskal(maze, walls, unionFind, listener, stopFlag, pauseFlag);
             
-            if (listener != null && !stopFlag.get()) {
-                listener.onGenerationComplete();
-            }
         }
         
         private void createInitialRooms(Maze maze, int rows, int cols, MazeGenerationListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
@@ -429,9 +426,6 @@ public class MazeGenerator {
                 }
             }
             
-            if (listener != null && !stopFlag.get()) {
-                listener.onGenerationComplete();
-            }
         }
         
         private void addCellToMaze(Maze maze, boolean[][] inMaze, int row, int col, 

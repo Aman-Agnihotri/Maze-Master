@@ -40,7 +40,11 @@ public class MazeSolver {
         }
         
         maze.resetSolution();
-        return strategy.solve(maze, listener, stopFlag, pauseFlag);
+        boolean solved = strategy.solve(maze, listener, stopFlag, pauseFlag);
+        if (listener != null && !stopFlag.get()) {
+            listener.onSolvingComplete(solved);
+        }
+        return solved;
     }
     
     /**
@@ -89,10 +93,6 @@ public class MazeSolver {
         @Override
         public boolean solve(Maze maze, MazeSolvingListener listener, AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
             boolean result = solveDFS(maze, maze.getStartRow(), maze.getStartCol(), listener, stopFlag, pauseFlag);
-            
-            if (listener != null && !stopFlag.get()) {
-                listener.onSolvingComplete(result);
-            }
             
             return result;
         }
@@ -186,9 +186,6 @@ public class MazeSolver {
                 exploreNeighbors(maze, current, queue, parent, listener, stopFlag, pauseFlag);
             }
             
-            if (listener != null && !stopFlag.get()) {
-                listener.onSolvingComplete(false);
-            }
             return false;
         }
 
@@ -204,7 +201,6 @@ public class MazeSolver {
             
             if (listener != null && !stopFlag.get()) {
                 listener.onPathFound(path);
-                listener.onSolvingComplete(true);
             }
             return true;
         }
@@ -308,9 +304,6 @@ public class MazeSolver {
                 }
             }
             
-            if (listener != null && !stopFlag.get()) {
-                listener.onSolvingComplete(false);
-            }
             return false;
         }
 
@@ -333,7 +326,6 @@ public class MazeSolver {
             
             if (listener != null && !stopFlag.get()) {
                 listener.onPathFound(path);
-                listener.onSolvingComplete(true);
             }
             return true;
         }

@@ -1,0 +1,338 @@
+package com.mazemaster.controller;
+
+import com.mazemaster.model.Maze;
+import com.mazemaster.ui.MazeView;
+import org.junit.jupiter.api.Test;
+
+import java.awt.Point;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class MazeControllerTest {
+
+    @Test
+    void shouldReportGenerationCompletionOnce() throws InterruptedException {
+        MazeController controller = new MazeController();
+        RecordingMazeView view = new RecordingMazeView();
+        controller.setView(view);
+        controller.createNewMaze(7, 7);
+        controller.setAnimationSpeed(1);
+
+        try {
+            controller.generateMaze();
+            await(() -> !controller.isGenerating());
+
+            assertThat(view.generationCompleted.get()).isEqualTo(1);
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldReportSolvingCompletionOnce() throws InterruptedException {
+        MazeController controller = new MazeController();
+        RecordingMazeView view = new RecordingMazeView();
+        controller.setView(view);
+        controller.createNewMaze(7, 7);
+        controller.setAnimationSpeed(1);
+
+        try {
+            controller.generateMaze();
+            await(() -> !controller.isGenerating());
+
+            controller.solveMaze();
+            await(() -> !controller.isSolving());
+
+            assertThat(view.solvingCompleted.get()).isEqualTo(1);
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldResetPausedGenerationToBlankMaze() throws InterruptedException {
+        MazeController controller = new MazeController();
+        RecordingMazeView view = new RecordingMazeView();
+        controller.setView(view);
+        controller.createNewMaze(21, 21);
+        controller.setAnimationSpeed(50);
+
+        try {
+            controller.generateMaze();
+            await(() -> controller.isGenerating() && hasAnyOpenCell(controller.getMaze()));
+
+            controller.pauseResumeCurrentOperation();
+            await(controller::isGenerationPaused);
+
+            controller.resetMaze();
+
+            assertThat(controller.isGenerating()).isFalse();
+            assertThat(controller.isGenerationPaused()).isFalse();
+            assertThat(hasAnyOpenCell(controller.getMaze())).isFalse();
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldResumeGenerationFromPausedState() throws InterruptedException {
+        MazeController controller = new MazeController();
+        RecordingMazeView view = new RecordingMazeView();
+        controller.setView(view);
+        controller.createNewMaze(21, 21);
+        controller.setAnimationSpeed(50);
+
+        try {
+            controller.generateMaze();
+            await(() -> controller.isGenerating() && hasAnyOpenCell(controller.getMaze()));
+
+            controller.pauseResumeCurrentOperation();
+            await(controller::isGenerationPaused);
+            int cellsAtPause = waitForStableCellCount(controller.getMaze(), MazeControllerTest::countNonWallCells);
+
+            Thread.sleep(150);
+
+            assertThat(controller.isGenerating()).isTrue();
+            assertThat(countNonWallCells(controller.getMaze())).isEqualTo(cellsAtPause);
+
+            controller.setAnimationSpeed(1);
+            controller.pauseResumeCurrentOperation();
+            await(() -> !controller.isGenerating());
+
+            assertThat(controller.isGenerationPaused()).isFalse();
+            assertThat(controller.isMazeFullyGenerated()).isTrue();
+            assertThat(view.generationCompleted.get()).isEqualTo(1);
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldResumeSolvingFromPausedState() throws InterruptedException {
+        MazeController controller = new MazeController();
+        RecordingMazeView view = new RecordingMazeView();
+        controller.setView(view);
+        controller.createNewMaze(21, 21);
+        controller.setAnimationSpeed(1);
+
+        try {
+            controller.generateMaze();
+            await(() -> !controller.isGenerating());
+
+            controller.setAnimationSpeed(50);
+            controller.solveMaze();
+            await(() -> controller.isSolving() && countSolvingCells(controller.getMaze()) > 0);
+
+            controller.pauseResumeCurrentOperation();
+            await(controller::isSolvingPaused);
+            int cellsAtPause = waitForStableCellCount(controller.getMaze(), MazeControllerTest::countSolvingCells);
+
+            Thread.sleep(150);
+
+            assertThat(controller.isSolving()).isTrue();
+            assertThat(countSolvingCells(controller.getMaze())).isEqualTo(cellsAtPause);
+
+            controller.setAnimationSpeed(1);
+            controller.pauseResumeCurrentOperation();
+            await(() -> !controller.isSolving());
+
+            assertThat(controller.isSolvingPaused()).isFalse();
+            assertThat(view.solvingCompleted.get()).isEqualTo(1);
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldNormalizeDimensionsWithinSupportedOddBounds() {
+        MazeController controller = new MazeController();
+
+        try {
+            controller.createNewMaze(200, 4);
+
+            assertThat(controller.getMaze().getRows()).isEqualTo(199);
+            assertThat(controller.getMaze().getColumns()).isEqualTo(5);
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldTreatMazeAsGeneratedOnlyWhenStartCanReachGoal() {
+        MazeController controller = new MazeController();
+
+        try {
+            controller.createNewMaze(5, 5);
+            Maze maze = controller.getMaze();
+            maze.setCell(maze.getStartRow(), maze.getStartCol(), Maze.EMPTY);
+            maze.setCell(maze.getGoalRow(), maze.getGoalCol(), Maze.EMPTY);
+
+            assertThat(controller.isMazeFullyGenerated()).isFalse();
+
+            maze.setCell(1, 2, Maze.EMPTY);
+            maze.setCell(1, 3, Maze.EMPTY);
+            maze.setCell(2, 3, Maze.EMPTY);
+
+            assertThat(controller.isMazeFullyGenerated()).isTrue();
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    private static void await(BooleanSupplier condition) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (!condition.getAsBoolean() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertThat(condition.getAsBoolean()).isTrue();
+    }
+
+    private static int waitForStableCellCount(Maze maze, CellCounter counter) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 5_000;
+        int previous = counter.count(maze);
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(120);
+            int current = counter.count(maze);
+            if (current == previous) {
+                return current;
+            }
+            previous = current;
+        }
+        return previous;
+    }
+
+    private static boolean hasAnyOpenCell(Maze maze) {
+        for (int row = 0; row < maze.getRows(); row++) {
+            for (int col = 0; col < maze.getColumns(); col++) {
+                if (maze.getCell(row, col) != Maze.WALL) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static int countNonWallCells(Maze maze) {
+        int count = 0;
+        for (int row = 0; row < maze.getRows(); row++) {
+            for (int col = 0; col < maze.getColumns(); col++) {
+                if (maze.getCell(row, col) != Maze.WALL) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static int countSolvingCells(Maze maze) {
+        int count = 0;
+        for (int row = 0; row < maze.getRows(); row++) {
+            for (int col = 0; col < maze.getColumns(); col++) {
+                int cell = maze.getCell(row, col);
+                if (cell == Maze.PATH || cell == Maze.VISITED || cell == Maze.START) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    @FunctionalInterface
+    private interface CellCounter {
+        int count(Maze maze);
+    }
+
+    private static class RecordingMazeView implements MazeView {
+        private final AtomicInteger generationCompleted = new AtomicInteger();
+        private final AtomicInteger solvingCompleted = new AtomicInteger();
+
+        @Override
+        public void updateMaze(Maze maze) {
+        }
+
+        @Override
+        public void refresh() {
+        }
+
+        @Override
+        public void onCellChanged(int row, int col, int newValue) {
+        }
+
+        @Override
+        public void onGenerationStarted() {
+        }
+
+        @Override
+        public void onGenerationCompleted() {
+            generationCompleted.incrementAndGet();
+        }
+
+        @Override
+        public void onSolvingStarted() {
+        }
+
+        @Override
+        public void onSolvingCompleted(boolean solved) {
+            solvingCompleted.incrementAndGet();
+        }
+
+        @Override
+        public void onPathFound(List<Point> path) {
+        }
+
+        @Override
+        public void onOperationPaused() {
+        }
+
+        @Override
+        public void onOperationResumed() {
+        }
+
+        @Override
+        public void showMessage(String message, boolean isError) {
+        }
+
+        @Override
+        public int[] getMazeDimensions() {
+            return new int[0];
+        }
+
+        @Override
+        public void showProgress(boolean show, String message) {
+        }
+
+        @Override
+        public void updateGenerationAlgorithms(Set<String> algorithms) {
+        }
+
+        @Override
+        public void updateSolvingAlgorithms(Set<String> algorithms) {
+        }
+
+        @Override
+        public void setSelectedGenerationAlgorithm(String algorithm) {
+        }
+
+        @Override
+        public void setSelectedSolvingAlgorithm(String algorithm) {
+        }
+
+        @Override
+        public void updateControlsState(boolean isGenerating, boolean isSolving) {
+        }
+
+        @Override
+        public boolean exportToImage(String filename) {
+            return false;
+        }
+
+        @Override
+        public String getExportFilename() {
+            return null;
+        }
+    }
+}
