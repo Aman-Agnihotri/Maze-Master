@@ -46,6 +46,23 @@ class MazeGeneratorTest {
         assertThat(isReachable(maze)).isTrue();
     }
 
+    @ParameterizedTest
+    @MethodSource("generationAlgorithms")
+    void shouldGenerateSameMazeForSameSeed(String algorithm) {
+        Maze firstMaze = new Maze(21, 21);
+        Maze secondMaze = new Maze(21, 21);
+        MazeGenerator firstGenerator = new MazeGenerator(12345L);
+        MazeGenerator secondGenerator = new MazeGenerator(12345L);
+
+        firstGenerator.setDelay(1);
+        secondGenerator.setDelay(1);
+
+        firstGenerator.generate(firstMaze, algorithm, new AtomicBoolean(false), new AtomicBoolean(false));
+        secondGenerator.generate(secondMaze, algorithm, new AtomicBoolean(false), new AtomicBoolean(false));
+
+        assertThat(firstMaze.getGrid()).isDeepEqualTo(secondMaze.getGrid());
+    }
+
     private static Stream<String> generationAlgorithms() {
         return Stream.of("DFS", "Kruskal", "Prim");
     }

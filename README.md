@@ -43,7 +43,7 @@
   - **Solving paused**: Reset clears solution only (preserves maze)
 
 - 💾 **Advanced File Operations**
-  - Save/Load maze states (serialized format)
+  - Save/Load maze states (versioned text format)
   - Export mazes as high-quality PNG images
   - File dialogs with format selection
   - Comprehensive error handling
@@ -268,12 +268,11 @@ src/main/java/com/mazemaster/
 ```java
 public class MyGenerationAlgorithm implements MazeGenerationStrategy {
     @Override
-    public void generate(Maze maze, MazeGenerationListener listener, 
-                        AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
+    public void generate(Maze maze, MazeGenerationContext context) {
         // Your algorithm implementation
-        // Use listener.onCellChanged() for real-time updates
-        // Check stopFlag.get() for cancellation
-        // Check pauseFlag.get() for pause state
+        // Use context.notifyCellChanged() for real-time updates
+        // Use context.isStopped() for cancellation
+        // Use context.pauseAwareSleep() for pause/resume-aware animation
     }
 }
 ```
@@ -292,11 +291,10 @@ strategies.put("My Algorithm", new MyGenerationAlgorithm());
 ```java
 public class MySolvingAlgorithm implements MazeSolvingStrategy {
     @Override
-    public boolean solve(Maze maze, MazeSolvingListener listener, 
-                        AtomicBoolean stopFlag, AtomicBoolean pauseFlag) {
+    public boolean solve(Maze maze, MazeSolvingContext context) {
         // Your pathfinding implementation
         // Return true if solution found
-        // Handle pause/resume logic
+        // Use context.pauseAwareSleep() for pause/resume-aware animation
     }
 }
 ```
@@ -336,7 +334,7 @@ The project includes comprehensive unit tests using modern testing frameworks:
 ./gradlew test --info
 
 # Generate test reports
-./gradlew test jacocoTestReport
+./gradlew test
 ```
 
 **Testing Stack**:

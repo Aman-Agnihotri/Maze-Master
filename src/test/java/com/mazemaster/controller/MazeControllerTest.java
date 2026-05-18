@@ -3,8 +3,10 @@ package com.mazemaster.controller;
 import com.mazemaster.model.Maze;
 import com.mazemaster.ui.MazeView;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.awt.Point;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -178,6 +180,32 @@ class MazeControllerTest {
             maze.setCell(2, 3, Maze.EMPTY);
 
             assertThat(controller.isMazeFullyGenerated()).isTrue();
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldSaveAndLoadMazeUsingExplicitFileFormat(@TempDir Path tempDir) {
+        MazeController controller = new MazeController();
+        Path saveFile = tempDir.resolve("maze.maze");
+
+        try {
+            controller.createNewMaze(5, 5);
+            Maze maze = controller.getMaze();
+            maze.setCell(1, 1, Maze.EMPTY);
+            maze.setCell(1, 2, Maze.PATH);
+            maze.setCell(1, 3, Maze.START);
+
+            controller.saveMaze(saveFile);
+            controller.createNewMaze(7, 7);
+            controller.loadMaze(saveFile);
+
+            assertThat(controller.getMaze().getRows()).isEqualTo(5);
+            assertThat(controller.getMaze().getColumns()).isEqualTo(5);
+            assertThat(controller.getMaze().getCell(1, 1)).isEqualTo(Maze.EMPTY);
+            assertThat(controller.getMaze().getCell(1, 2)).isEqualTo(Maze.PATH);
+            assertThat(controller.getMaze().getCell(1, 3)).isEqualTo(Maze.START);
         } finally {
             controller.shutdown();
         }

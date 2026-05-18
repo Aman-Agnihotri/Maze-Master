@@ -4,15 +4,23 @@ package com.mazemaster.controller;
 import com.mazemaster.model.Maze;
 import com.mazemaster.generation.MazeGenerator;
 import com.mazemaster.generation.MazeGenerationListener;
+import com.mazemaster.persistence.MazeFileService;
 import com.mazemaster.solving.MazeSolver;
 import com.mazemaster.solving.MazeSolvingListener;
 import com.mazemaster.ui.MazeView;
 
 import java.awt.Point;
-import java.io.*;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -26,6 +34,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     private Maze maze;
     private final MazeGenerator generator;
     private final MazeSolver solver;
+    private final MazeFileService mazeFileService;
+    private final ExecutorService operationExecutor;
     private MazeView view;
     
     // State management
@@ -39,20 +49,22 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     private final AtomicBoolean pauseGeneration = new AtomicBoolean(false);
     private final AtomicBoolean pauseSolving = new AtomicBoolean(false);
     
-    // Threading
-    private Thread generationThread;
-    private Thread solvingThread;
+    // Background operations
+    private Future<?> generationTask;
+    private Future<?> solvingTask;
     
     // Configuration
     private String currentGenerationAlgorithm = "DFS";
     private String currentSolvingAlgorithm = "Depth First Search";
-    private static final String SAVE_FILE_NAME = "mazeSave.ser";
+    private static final Path SAVE_FILE_PATH = Path.of("mazeSave.maze");
     private static final int MIN_MAZE_DIMENSION = 5;
     private static final int MAX_MAZE_DIMENSION = 200;
     
     public MazeController() {
         this.generator = new MazeGenerator();
         this.solver = new MazeSolver();
+        this.mazeFileService = new MazeFileService();
+        this.operationExecutor = Executors.newSingleThreadExecutor();
         
         // Set up listeners
         generator.setGenerationListener(this);
@@ -97,7 +109,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         stopGeneration.set(false);
         pauseGeneration.set(false);
         
-        generationThread = new Thread(() -> {
+        generationTask = operationExecutor.submit(() -> {
             try {
                 if (view != null) {
                     view.onGenerationStarted();
@@ -115,8 +127,6 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                 isGenerationPaused = false;
             }
         });
-        
-        generationThread.start();
     }
     
     public void solveMaze() {
@@ -129,7 +139,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         stopSolving.set(false);
         pauseSolving.set(false);
         
-        solvingThread = new Thread(() -> {
+        solvingTask = operationExecutor.submit(() -> {
             try {
                 if (view != null) {
                     view.onSolvingStarted();
@@ -148,8 +158,6 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                 isSolvingPaused = false;
             }
         });
-        
-        solvingThread.start();
     }
     
     public void pauseResumeCurrentOperation() {
@@ -213,26 +221,14 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             stopGeneration.set(true);
             pauseGeneration.set(false);
             isGenerationPaused = false;
-            if (generationThread != null) {
-                try {
-                    generationThread.join(1000); // Wait up to 1 second
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            waitForTask(generationTask);
         }
         
         if (isSolving) {
             stopSolving.set(true);
             pauseSolving.set(false);
             isSolvingPaused = false;
-            if (solvingThread != null) {
-                try {
-                    solvingThread.join(1000); // Wait up to 1 second
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            waitForTask(solvingTask);
         }
     }
     
@@ -334,10 +330,14 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     }
     
     public void saveMaze() {
+        saveMaze(SAVE_FILE_PATH);
+    }
+
+    public void saveMaze(Path path) {
         if (maze == null) return;
         
-        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(SAVE_FILE_NAME))) {
-            out.writeObject(maze);
+        try {
+            mazeFileService.save(maze, path);
             if (view != null) {
                 view.showMessage("Maze saved successfully!", false);
             }
@@ -350,18 +350,21 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     }
     
     public void loadMaze() {
-        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(SAVE_FILE_NAME))) {
+        loadMaze(SAVE_FILE_PATH);
+    }
+
+    public void loadMaze(Path path) {
+        try {
             stopAllOperations();
             
-            Maze loadedMaze = (Maze) in.readObject();
-            this.maze = loadedMaze;
+            this.maze = mazeFileService.load(path);
             
             if (view != null) {
                 view.updateMaze(maze);
                 view.refresh();
                 view.showMessage("Maze loaded successfully!", false);
             }
-        } catch (IOException | ClassNotFoundException e) {
+        } catch (IOException e) {
             e.printStackTrace();
             if (view != null) {
                 view.showMessage("Error loading maze: " + e.getMessage(), true);
@@ -390,6 +393,12 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         int delay = Math.max(1, speed);
         generator.setDelay(delay);
         solver.setDelay(delay);
+    }
+
+    public void setRandomSeed(long seed) {
+        if (!isBusy()) {
+            generator.setRandomSeed(seed);
+        }
     }
     
     // =========================
@@ -491,22 +500,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         stopGeneration.set(true);
         stopSolving.set(true);
         
-        // Wait for threads to finish
-        if (generationThread != null && generationThread.isAlive()) {
-            try {
-                generationThread.join(1000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-        
-        if (solvingThread != null && solvingThread.isAlive()) {
-            try {
-                solvingThread.join(1000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
+        waitForTask(generationTask);
+        waitForTask(solvingTask);
         
         // Reset all state flags
         isGenerating = false;
@@ -522,12 +517,30 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         }
         return normalized;
     }
-    
+
+    private void waitForTask(Future<?> task) {
+        if (task == null || task.isDone()) {
+            return;
+        }
+
+        try {
+            task.get(1000, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            task.cancel(true);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            task.cancel(true);
+        } catch (ExecutionException e) {
+            // Operation tasks report user-facing errors before they complete.
+        }
+    }
+
     // =========================
     // Cleanup
     // =========================
     
     public void shutdown() {
         stopAllOperations();
+        operationExecutor.shutdownNow();
     }
 }

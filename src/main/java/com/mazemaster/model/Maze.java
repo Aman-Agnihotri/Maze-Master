@@ -1,15 +1,11 @@
 // src/main/java/com/mazemaster/model/Maze.java
 package com.mazemaster.model;
 
-import java.io.Serializable;
-
 /**
  * Core data model representing the maze structure and state.
  * Contains the maze grid and provides methods for accessing and modifying maze cells.
  */
-public class Maze implements Serializable {
-    private static final long serialVersionUID = 1L;
-    
+public class Maze {
     // Cell type constants
     public static final int BACKGROUND = 0;
     public static final int WALL = 1;
