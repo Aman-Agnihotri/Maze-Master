@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 
 /**
@@ -14,7 +15,7 @@ import java.util.List;
  */
 public class MazeFileService {
     private static final String MAGIC = "MAZE_MASTER_SAVE";
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
 
     public void save(Maze maze, Path path) throws IOException {
         Path parent = path.getParent();
@@ -26,6 +27,10 @@ public class MazeFileService {
             writer.write(MAGIC + " " + VERSION);
             writer.newLine();
             writer.write(maze.getRows() + " " + maze.getColumns());
+            writer.newLine();
+            writer.write("seed " + maze.getGenerationSeed());
+            writer.newLine();
+            writer.write("algorithm " + encode(maze.getGenerationAlgorithm()));
             writer.newLine();
 
             for (int row = 0; row < maze.getRows(); row++) {
@@ -52,7 +57,7 @@ public class MazeFileService {
         }
 
         int version = parseInt(header[1], "version");
-        if (version != VERSION) {
+        if (version != 1 && version != VERSION) {
             throw new IOException("Unsupported maze file version: " + version);
         }
 
@@ -63,13 +68,25 @@ public class MazeFileService {
 
         int rows = parseInt(dimensions[0], "rows");
         int columns = parseInt(dimensions[1], "columns");
-        if (rows < 3 || columns < 3 || lines.size() < rows + 2) {
+        int gridStartLine = 2;
+        long generationSeed = 0L;
+        String generationAlgorithm = "";
+        if (version >= 2) {
+            if (lines.size() < 5) {
+                throw new IOException("Maze file metadata is incomplete");
+            }
+            generationSeed = parseMetadataLong(lines.get(2), "seed");
+            generationAlgorithm = decode(parseMetadataValue(lines.get(3), "algorithm"));
+            gridStartLine = 4;
+        }
+
+        if (rows < 3 || columns < 3 || lines.size() < rows + gridStartLine) {
             throw new IOException("Maze dimensions do not match file contents");
         }
 
         Maze maze = new Maze(rows, columns);
         for (int row = 0; row < rows; row++) {
-            String[] cells = lines.get(row + 2).trim().split("\\s+");
+            String[] cells = lines.get(row + gridStartLine).trim().split("\\s+");
             if (cells.length != columns) {
                 throw new IOException("Maze row " + row + " has an invalid cell count");
             }
@@ -82,6 +99,7 @@ public class MazeFileService {
                 maze.setCell(row, col, cell);
             }
         }
+        maze.setGenerationMetadata(generationSeed, generationAlgorithm);
 
         return maze;
     }
@@ -102,5 +120,37 @@ public class MazeFileService {
             cell == Maze.VISITED ||
             cell == Maze.START ||
             cell == Maze.GOAL;
+    }
+
+    private long parseMetadataLong(String line, String key) throws IOException {
+        return parseLong(parseMetadataValue(line, key), key);
+    }
+
+    private String parseMetadataValue(String line, String key) throws IOException {
+        String[] parts = line.trim().split("\\s+", 2);
+        if (parts.length != 2 || !key.equals(parts[0])) {
+            throw new IOException("Missing maze metadata: " + key);
+        }
+        return parts[1];
+    }
+
+    private long parseLong(String value, String fieldName) throws IOException {
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            throw new IOException("Invalid " + fieldName + ": " + value, e);
+        }
+    }
+
+    private String encode(String value) {
+        return Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String decode(String value) throws IOException {
+        try {
+            return new String(Base64.getDecoder().decode(value), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            throw new IOException("Invalid algorithm metadata", e);
+        }
     }
 }

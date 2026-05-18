@@ -19,6 +19,7 @@ class MazeFileServiceTest {
         Maze maze = new Maze(5, 5);
         Path saveFile = tempDir.resolve("round-trip.maze");
 
+        maze.setGenerationMetadata(987654321L, "Prim");
         maze.setCell(1, 1, Maze.EMPTY);
         maze.setCell(1, 2, Maze.PATH);
         maze.setCell(2, 2, Maze.VISITED);
@@ -29,6 +30,8 @@ class MazeFileServiceTest {
 
         assertThat(loadedMaze.getRows()).isEqualTo(5);
         assertThat(loadedMaze.getColumns()).isEqualTo(5);
+        assertThat(loadedMaze.getGenerationSeed()).isEqualTo(987654321L);
+        assertThat(loadedMaze.getGenerationAlgorithm()).isEqualTo("Prim");
         assertThat(loadedMaze.getGrid()).isDeepEqualTo(maze.getGrid());
     }
 

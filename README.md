@@ -51,6 +51,7 @@
 - 🎛️ **Enhanced User Controls**
   - Customizable maze dimensions (5x5 to 200x200)
   - Algorithm selection with dropdown menus
+  - Reproducible generation seed with randomize control
   - Smart operation controls (Generate/Solve/Pause/Reset)
   - Real-time status updates and feedback
   - Keyboard shortcuts and tooltips
@@ -131,16 +132,19 @@
 1. **Launch Application**: Run via Gradle or JAR file
 2. **Set Dimensions**: Enter desired maze size in the side panel
 3. **Choose Generation Algorithm**: Select from dropdown (default: DFS)
-4. **Generate Maze**: Click "Generate" and watch real-time creation
-5. **Pause/Resume**: Use "Pause" button to pause generation at any time
-6. **Select Solving Algorithm**: Choose pathfinding method
-7. **Solve Maze**: Click "Solve" to watch the algorithm work
-8. **Adjust Settings**: Use speed slider and zoom controls
-9. **Save/Export**: Preserve your maze or export as image
+4. **Set or Randomize Seed**: Keep the displayed seed to recreate a maze later
+5. **Generate Maze**: Click "Generate" and watch real-time creation
+6. **Pause/Resume**: Use "Pause" button to pause generation at any time
+7. **Select Solving Algorithm**: Choose pathfinding method
+8. **Solve Maze**: Click "Solve" to watch the algorithm work
+9. **Adjust Settings**: Use speed slider and zoom controls
+10. **Save/Export**: Preserve your maze or export as image
 
 ### Advanced Controls
 
 - **Mouse Wheel**: Zoom in/out (zoom level persists)
+- **Seed Field**: Reuse the same seed, generation algorithm, and dimensions to recreate a maze
+- **Create Seed Button**: Creates a fresh maze from the entered seed and current dimensions
 - **Pause/Resume Button**: Pause any operation and resume from exact same state
 - **Reset Button**: Context-aware reset (clears solution or resets to blank)
 - **New Maze Button**: Creates entirely new maze with current dimensions

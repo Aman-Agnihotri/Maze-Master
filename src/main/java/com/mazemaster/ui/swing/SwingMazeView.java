@@ -39,11 +39,14 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JButton loadButton;
     private JButton exportButton;
     private JButton newMazeButton;
+    private JButton randomizeSeedButton;
+    private JButton createFromSeedButton;
     
     private JComboBox<String> generationAlgorithmBox;
     private JComboBox<String> solvingAlgorithmBox;
     private JTextField rowsField;
     private JTextField columnsField;
+    private JTextField seedField;
     private JLabel statusLabel;
     private JSlider speedSlider;
 
@@ -234,10 +237,50 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         // Maze dimensions
         panel.add(createDimensionsPanel());
         panel.add(Box.createVerticalStrut(10));
+
+        // Reproducible seed
+        panel.add(createSeedPanel());
+        panel.add(Box.createVerticalStrut(10));
         
         // Speed control
         panel.add(createSpeedPanel());
         
+        return panel;
+    }
+
+    private JPanel createSeedPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        panel.setBorder(BorderFactory.createTitledBorder("Seed"));
+
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.anchor = GridBagConstraints.WEST;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        panel.add(new JLabel("Value:"), gbc);
+
+        seedField = new JTextField(String.valueOf(controller.getCurrentGenerationSeed()), 14);
+        seedField.setToolTipText("Use the same seed, algorithm, and dimensions to recreate a maze");
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(seedField, gbc);
+
+        randomizeSeedButton = createButton("Random", "Generate a new random seed");
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(randomizeSeedButton, gbc);
+
+        createFromSeedButton = createButton("Create", "Create and generate a maze from this seed");
+        gbc.gridx = 1;
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(createFromSeedButton, gbc);
+
         return panel;
     }
     
@@ -380,6 +423,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
                 SwingUtilities.invokeLater(() -> {
                     rowsField.setText(String.valueOf(maze.getRows()));
                     columnsField.setText(String.valueOf(maze.getColumns()));
+                    seedField.setText(String.valueOf(controller.getCurrentGenerationSeed()));
                 });
             }
         }
@@ -401,7 +445,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     @Override
     public void onGenerationStarted() {
         SwingUtilities.invokeLater(() -> {
-            statusLabel.setText("Generating maze...");
+            statusLabel.setText("Generating maze with seed " + controller.getCurrentGenerationSeed() + "...");
             pauseResumeButton.setText("Pause");
             pauseResumeButton.setEnabled(true);
             updateControlsState(true, false);
@@ -411,7 +455,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     @Override
     public void onGenerationCompleted() {
         SwingUtilities.invokeLater(() -> {
-            statusLabel.setText("Maze generation completed");
+            statusLabel.setText("Maze generation completed (seed: " + controller.getCurrentGenerationSeed() + ")");
             pauseResumeButton.setText("Pause");
             pauseResumeButton.setEnabled(false);
             updateControlsState(false, false);
@@ -534,6 +578,11 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     public void setSelectedGenerationAlgorithm(String algorithm) {
         SwingUtilities.invokeLater(() -> generationAlgorithmBox.setSelectedItem(algorithm));
     }
+
+    @Override
+    public void setGenerationSeed(long seed) {
+        SwingUtilities.invokeLater(() -> seedField.setText(String.valueOf(seed)));
+    }
     
     @Override
     public void setSelectedSolvingAlgorithm(String algorithm) {
@@ -569,6 +618,9 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         solvingAlgorithmBox.setEnabled(!isBusy);
         rowsField.setEnabled(!isBusy);
         columnsField.setEnabled(!isBusy);
+        seedField.setEnabled(!isBusy);
+        randomizeSeedButton.setEnabled(!isBusy);
+        createFromSeedButton.setEnabled(!isBusy);
     }
     
     private void updateResetButton() {
@@ -650,7 +702,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         if (source == newMazeButton) {
             handleNewMazeAction();
         } else if (source == generateButton) {
-            controller.generateMaze();
+            handleGenerateAction();
         } else if (source == solveButton) {
             controller.solveMaze();
         } else if (source == pauseResumeButton) {
@@ -663,6 +715,10 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             controller.loadMaze();
         } else if (source == exportButton) {
             handleExportAction();
+        } else if (source == randomizeSeedButton) {
+            handleRandomizeSeedAction();
+        } else if (source == createFromSeedButton) {
+            handleCreateFromSeedAction();
         } else if (source == generationAlgorithmBox) {
             handleGenerationAlgorithmChange();
         } else if (source == solvingAlgorithmBox) {
@@ -672,9 +728,49 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     
     private void handleNewMazeAction() {
         int[] dimensions = getMazeDimensions();
-        if (dimensions.length == 2) {
+        if (dimensions.length == 2 && applySeedFromField()) {
             controller.createNewMaze(dimensions[0], dimensions[1]);
             statusLabel.setText("New maze created");
+        }
+    }
+
+    private void handleGenerateAction() {
+        if (applySeedFromField()) {
+            controller.generateMaze();
+        }
+    }
+
+    private boolean applySeedFromField() {
+        Long seed = getSeedFromField();
+        if (seed == null) {
+            return false;
+        }
+
+        controller.setRandomSeed(seed);
+        return true;
+    }
+
+    private Long getSeedFromField() {
+        try {
+            return Long.parseLong(seedField.getText().trim());
+        } catch (NumberFormatException e) {
+            showMessage("Invalid seed. Please enter a whole number between " + Long.MIN_VALUE + " and " + Long.MAX_VALUE + ".", true);
+            return null;
+        }
+    }
+
+    private void handleRandomizeSeedAction() {
+        long seed = controller.randomizeGenerationSeed();
+        seedField.setText(String.valueOf(seed));
+        statusLabel.setText("Seed randomized: " + seed);
+    }
+
+    private void handleCreateFromSeedAction() {
+        int[] dimensions = getMazeDimensions();
+        Long seed = getSeedFromField();
+        if (dimensions.length == 2 && seed != null) {
+            controller.createMazeFromSeed(dimensions[0], dimensions[1], seed);
+            statusLabel.setText("Generating maze from seed " + seed + "...");
         }
     }
     

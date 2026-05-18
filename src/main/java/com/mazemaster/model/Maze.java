@@ -22,6 +22,8 @@ public class Maze {
     private final int startCol;
     private final int goalRow;
     private final int goalCol;
+    private long generationSeed;
+    private String generationAlgorithm;
     
     public Maze(int rows, int columns) {
         this.rows = rows;
@@ -31,6 +33,8 @@ public class Maze {
         this.startCol = 1;
         this.goalRow = rows - 2;
         this.goalCol = columns - 2;
+        this.generationSeed = 0L;
+        this.generationAlgorithm = "";
         initializeWalls();
     }
     
@@ -88,6 +92,13 @@ public class Maze {
     public int getStartCol() { return startCol; }
     public int getGoalRow() { return goalRow; }
     public int getGoalCol() { return goalCol; }
+    public long getGenerationSeed() { return generationSeed; }
+    public String getGenerationAlgorithm() { return generationAlgorithm; }
+
+    public void setGenerationMetadata(long generationSeed, String generationAlgorithm) {
+        this.generationSeed = generationSeed;
+        this.generationAlgorithm = generationAlgorithm == null ? "" : generationAlgorithm;
+    }
     
     public int[][] getGrid() {
         // Return defensive copy

@@ -21,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -56,6 +57,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     // Configuration
     private String currentGenerationAlgorithm = "DFS";
     private String currentSolvingAlgorithm = "Depth First Search";
+    private long currentGenerationSeed = createRandomSeed();
     private static final Path SAVE_FILE_PATH = Path.of("mazeSave.maze");
     private static final int MIN_MAZE_DIMENSION = 5;
     private static final int MAX_MAZE_DIMENSION = 200;
@@ -92,11 +94,23 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         columns = normalizeDimension(columns);
         
         this.maze = new Maze(rows, columns);
+        maze.setGenerationMetadata(currentGenerationSeed, currentGenerationAlgorithm);
         
         if (view != null) {
             view.updateMaze(maze);
+            view.setGenerationSeed(currentGenerationSeed);
             view.refresh();
         }
+    }
+
+    public void createMazeFromSeed(int rows, int columns, long seed) {
+        if (isBusy()) {
+            return;
+        }
+
+        setRandomSeed(seed);
+        createNewMaze(rows, columns);
+        generateMaze();
     }
     
     public void generateMaze() {
@@ -108,6 +122,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         isGenerationPaused = false;
         stopGeneration.set(false);
         pauseGeneration.set(false);
+        generator.setRandomSeed(currentGenerationSeed);
+        maze.setGenerationMetadata(currentGenerationSeed, currentGenerationAlgorithm);
         
         generationTask = operationExecutor.submit(() -> {
             try {
@@ -358,9 +374,16 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             stopAllOperations();
             
             this.maze = mazeFileService.load(path);
+            currentGenerationSeed = maze.getGenerationSeed();
+            String loadedAlgorithm = maze.getGenerationAlgorithm();
+            if (generator.getAvailableAlgorithms().contains(loadedAlgorithm)) {
+                currentGenerationAlgorithm = loadedAlgorithm;
+            }
             
             if (view != null) {
                 view.updateMaze(maze);
+                view.setGenerationSeed(currentGenerationSeed);
+                view.setSelectedGenerationAlgorithm(currentGenerationAlgorithm);
                 view.refresh();
                 view.showMessage("Maze loaded successfully!", false);
             }
@@ -397,8 +420,18 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
 
     public void setRandomSeed(long seed) {
         if (!isBusy()) {
+            currentGenerationSeed = seed;
             generator.setRandomSeed(seed);
+            if (view != null) {
+                view.setGenerationSeed(seed);
+            }
         }
+    }
+
+    public long randomizeGenerationSeed() {
+        long seed = createRandomSeed();
+        setRandomSeed(seed);
+        return currentGenerationSeed;
     }
     
     // =========================
@@ -415,6 +448,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     public Maze getMaze() { return maze; }
     public String getCurrentGenerationAlgorithm() { return currentGenerationAlgorithm; }
     public String getCurrentSolvingAlgorithm() { return currentSolvingAlgorithm; }
+    public long getCurrentGenerationSeed() { return currentGenerationSeed; }
     
     public java.util.Set<String> getAvailableGenerationAlgorithms() {
         return generator.getAvailableAlgorithms();
@@ -516,6 +550,10 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             normalized = normalized == MAX_MAZE_DIMENSION ? normalized - 1 : normalized + 1;
         }
         return normalized;
+    }
+
+    private long createRandomSeed() {
+        return ThreadLocalRandom.current().nextLong();
     }
 
     private void waitForTask(Future<?> task) {

@@ -191,6 +191,8 @@ class MazeControllerTest {
         Path saveFile = tempDir.resolve("maze.maze");
 
         try {
+            controller.setRandomSeed(1234L);
+            controller.setGenerationAlgorithm("Prim");
             controller.createNewMaze(5, 5);
             Maze maze = controller.getMaze();
             maze.setCell(1, 1, Maze.EMPTY);
@@ -206,6 +208,31 @@ class MazeControllerTest {
             assertThat(controller.getMaze().getCell(1, 1)).isEqualTo(Maze.EMPTY);
             assertThat(controller.getMaze().getCell(1, 2)).isEqualTo(Maze.PATH);
             assertThat(controller.getMaze().getCell(1, 3)).isEqualTo(Maze.START);
+            assertThat(controller.getCurrentGenerationSeed()).isEqualTo(1234L);
+            assertThat(controller.getCurrentGenerationAlgorithm()).isEqualTo("Prim");
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldCreateMazeFromSeedReproducibly() throws InterruptedException {
+        MazeController controller = new MazeController();
+        controller.setGenerationAlgorithm("Kruskal");
+        controller.setAnimationSpeed(1);
+
+        try {
+            controller.createMazeFromSeed(21, 21, 5678L);
+            await(() -> !controller.isGenerating());
+            int[][] firstGrid = controller.getMaze().getGrid();
+
+            controller.createMazeFromSeed(21, 21, 5678L);
+            await(() -> !controller.isGenerating());
+
+            assertThat(controller.getCurrentGenerationSeed()).isEqualTo(5678L);
+            assertThat(controller.getMaze().getGenerationSeed()).isEqualTo(5678L);
+            assertThat(controller.getMaze().getGenerationAlgorithm()).isEqualTo("Kruskal");
+            assertThat(controller.getMaze().getGrid()).isDeepEqualTo(firstGrid);
         } finally {
             controller.shutdown();
         }
@@ -343,6 +370,10 @@ class MazeControllerTest {
 
         @Override
         public void setSelectedGenerationAlgorithm(String algorithm) {
+        }
+
+        @Override
+        public void setGenerationSeed(long seed) {
         }
 
         @Override

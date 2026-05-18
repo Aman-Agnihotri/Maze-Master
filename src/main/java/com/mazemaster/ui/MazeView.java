@@ -129,6 +129,12 @@ public interface MazeView {
      * @param algorithm The algorithm name
      */
     void setSelectedGenerationAlgorithm(String algorithm);
+
+    /**
+     * Set the current generation seed value shown to the user
+     * @param seed The reproducible generation seed
+     */
+    void setGenerationSeed(long seed);
     
     /**
      * Set the current solving algorithm selection
