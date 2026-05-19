@@ -18,10 +18,10 @@ public class Maze {
     private int[][] grid;
     private final int rows;
     private final int columns;
-    private final int startRow;
-    private final int startCol;
-    private final int goalRow;
-    private final int goalCol;
+    private int startRow;
+    private int startCol;
+    private int goalRow;
+    private int goalCol;
     private long generationSeed;
     private String generationAlgorithm;
     
@@ -29,10 +29,7 @@ public class Maze {
         this.rows = rows;
         this.columns = columns;
         this.grid = new int[rows][columns];
-        this.startRow = 1;
-        this.startCol = 1;
-        this.goalRow = rows - 2;
-        this.goalCol = columns - 2;
+        resetEndpoints();
         this.generationSeed = 0L;
         this.generationAlgorithm = "";
         initializeWalls();
@@ -48,12 +45,13 @@ public class Maze {
     
     public void reset() {
         initializeWalls();
+        resetEndpoints();
     }
     
     public void resetSolution() {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
-                if (grid[i][j] == PATH || grid[i][j] == VISITED || grid[i][j] == START) {
+                if (grid[i][j] == PATH || grid[i][j] == VISITED || grid[i][j] == START || grid[i][j] == GOAL) {
                     grid[i][j] = EMPTY;
                 }
             }
@@ -84,6 +82,41 @@ public class Maze {
     
     public boolean isEmpty(int row, int col) {
         return isValidPosition(row, col) && grid[row][col] == EMPTY;
+    }
+
+    public boolean setStartPosition(int row, int col) {
+        if (!isValidPosition(row, col) || isGoalCell(row, col)) {
+            return false;
+        }
+
+        this.startRow = row;
+        this.startCol = col;
+        return true;
+    }
+
+    public boolean setGoalPosition(int row, int col) {
+        if (!isValidPosition(row, col) || isStartCell(row, col)) {
+            return false;
+        }
+
+        this.goalRow = row;
+        this.goalCol = col;
+        return true;
+    }
+
+    public void resetEndpoints() {
+        this.startRow = 1;
+        this.startCol = 1;
+        this.goalRow = rows - 2;
+        this.goalCol = columns - 2;
+    }
+
+    public boolean isStartCell(int row, int col) {
+        return row == startRow && col == startCol;
+    }
+
+    public boolean isGoalCell(int row, int col) {
+        return row == goalRow && col == goalCol;
     }
     
     public int getRows() { return rows; }

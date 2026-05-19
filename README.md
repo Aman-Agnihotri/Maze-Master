@@ -52,6 +52,7 @@
   - Customizable maze dimensions (5x5 to 200x200)
   - Algorithm selection with dropdown menus
   - Reproducible generation seed with randomize control
+  - Clickable start and goal selection on generated maze cells
   - Smart operation controls (Generate/Solve/Pause/Reset)
   - Real-time status updates and feedback
   - Keyboard shortcuts and tooltips
@@ -133,21 +134,25 @@
 2. **Set Dimensions**: Enter desired maze size in the side panel
 3. **Choose Generation Algorithm**: Select from dropdown (default: DFS)
 4. **Set or Randomize Seed**: Keep the displayed seed to recreate a maze later
-5. **Generate Maze**: Click "Generate" and watch real-time creation
-6. **Pause/Resume**: Use "Pause" button to pause generation at any time
-7. **Select Solving Algorithm**: Choose pathfinding method
-8. **Solve Maze**: Click "Solve" to watch the algorithm work
-9. **Adjust Settings**: Use speed slider and zoom controls
-10. **Save/Export**: Preserve your maze or export as image
+5. **Create Workspace**: Click "New Maze" to create a blank maze with current dimensions
+6. **Generate Maze**: Click "Generate" and watch real-time creation
+7. **Pause/Resume**: Use "Pause" button to pause generation at any time
+8. **Set Endpoints**: Select Start or Goal, then click an open maze cell
+9. **Select Solving Algorithm**: Choose pathfinding method
+10. **Solve Maze**: Click "Solve" to watch the algorithm work
+11. **Adjust Settings**: Use speed slider and zoom controls
+12. **Save/Export**: Preserve your maze or export as image
 
 ### Advanced Controls
 
 - **Mouse Wheel**: Zoom in/out (zoom level persists)
 - **Seed Field**: Reuse the same seed, generation algorithm, and dimensions to recreate a maze
 - **Create Seed Button**: Creates a fresh maze from the entered seed and current dimensions
+- **Endpoint Buttons**: Choose whether maze clicks update the start cell or goal cell
+- **Generate Button**: Runs the selected generation algorithm on the current maze workspace
 - **Pause/Resume Button**: Pause any operation and resume from exact same state
 - **Reset Button**: Context-aware reset (clears solution or resets to blank)
-- **New Maze Button**: Creates entirely new maze with current dimensions
+- **New Maze Button**: Creates a blank maze workspace with current dimensions
 - **Speed Slider**: Real-time animation speed control (persists)
 - **Window Management**: Resize, move, maximize - all settings persist
 

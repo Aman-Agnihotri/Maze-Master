@@ -238,6 +238,79 @@ class MazeControllerTest {
         }
     }
 
+    @Test
+    void shouldSetStartAndGoalCellsOnOpenMazeCells() {
+        MazeController controller = new MazeController();
+
+        try {
+            controller.createNewMaze(5, 5);
+            Maze maze = controller.getMaze();
+            maze.setCell(1, 1, Maze.EMPTY);
+            maze.setCell(1, 2, Maze.EMPTY);
+            maze.setCell(1, 3, Maze.EMPTY);
+            maze.setCell(2, 3, Maze.EMPTY);
+            maze.setCell(3, 3, Maze.EMPTY);
+
+            assertThat(controller.setStartCell(1, 3)).isTrue();
+            assertThat(controller.setGoalCell(3, 3)).isTrue();
+
+            assertThat(maze.getStartRow()).isEqualTo(1);
+            assertThat(maze.getStartCol()).isEqualTo(3);
+            assertThat(maze.getGoalRow()).isEqualTo(3);
+            assertThat(maze.getGoalCol()).isEqualTo(3);
+            assertThat(controller.isMazeFullyGenerated()).isTrue();
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldRejectEndpointCellsOnWallsOrExistingEndpoint() {
+        MazeController controller = new MazeController();
+
+        try {
+            controller.createNewMaze(5, 5);
+            Maze maze = controller.getMaze();
+            maze.setCell(1, 1, Maze.EMPTY);
+            maze.setCell(3, 3, Maze.EMPTY);
+
+            assertThat(controller.setStartCell(0, 0)).isFalse();
+            assertThat(controller.setStartCell(maze.getGoalRow(), maze.getGoalCol())).isFalse();
+            assertThat(controller.setGoalCell(maze.getStartRow(), maze.getStartCol())).isFalse();
+
+            assertThat(maze.getStartRow()).isEqualTo(1);
+            assertThat(maze.getStartCol()).isEqualTo(1);
+            assertThat(maze.getGoalRow()).isEqualTo(3);
+            assertThat(maze.getGoalCol()).isEqualTo(3);
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldClearSolutionWhenEndpointChanges() {
+        MazeController controller = new MazeController();
+
+        try {
+            controller.createNewMaze(5, 5);
+            Maze maze = controller.getMaze();
+            maze.setCell(1, 1, Maze.PATH);
+            maze.setCell(1, 2, Maze.START);
+            maze.setCell(1, 3, Maze.VISITED);
+            maze.setCell(3, 3, Maze.EMPTY);
+
+            assertThat(controller.setStartCell(1, 2)).isTrue();
+
+            assertThat(maze.getStartRow()).isEqualTo(1);
+            assertThat(maze.getStartCol()).isEqualTo(2);
+            assertThat(maze.getCell(1, 1)).isEqualTo(Maze.EMPTY);
+            assertThat(maze.getCell(1, 2)).isEqualTo(Maze.EMPTY);
+            assertThat(maze.getCell(1, 3)).isEqualTo(Maze.EMPTY);
+        } finally {
+            controller.shutdown();
+        }
+    }
+
     private static void await(BooleanSupplier condition) throws InterruptedException {
         long deadline = System.currentTimeMillis() + 5_000;
         while (!condition.getAsBoolean() && System.currentTimeMillis() < deadline) {

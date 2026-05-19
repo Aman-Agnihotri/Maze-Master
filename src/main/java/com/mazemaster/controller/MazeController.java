@@ -344,6 +344,14 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             }
         }
     }
+
+    public boolean setStartCell(int row, int col) {
+        return setEndpointCell(row, col, true);
+    }
+
+    public boolean setGoalCell(int row, int col) {
+        return setEndpointCell(row, col, false);
+    }
     
     public void saveMaze() {
         saveMaze(SAVE_FILE_PATH);
@@ -554,6 +562,24 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
 
     private long createRandomSeed() {
         return ThreadLocalRandom.current().nextLong();
+    }
+
+    private boolean setEndpointCell(int row, int col, boolean startCell) {
+        if (isBusy() || maze == null || !maze.isWalkable(row, col)) {
+            return false;
+        }
+
+        if ((startCell && maze.isGoalCell(row, col)) || (!startCell && maze.isStartCell(row, col))) {
+            return false;
+        }
+
+        maze.resetSolution();
+        boolean updated = startCell ? maze.setStartPosition(row, col) : maze.setGoalPosition(row, col);
+        if (updated && view != null) {
+            view.updateMaze(maze);
+            view.refresh();
+        }
+        return updated;
     }
 
     private void waitForTask(Future<?> task) {

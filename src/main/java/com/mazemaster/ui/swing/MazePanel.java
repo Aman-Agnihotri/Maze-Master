@@ -25,6 +25,7 @@ public class MazePanel extends JPanel {
         this.colors = colors.clone();
         setBackground(colors[Maze.BACKGROUND]);
         setOpaque(true);
+        setToolTipText("");
         
         // Add mouse wheel listener for zooming
         addMouseWheelListener(e -> {
@@ -192,12 +193,16 @@ public class MazePanel extends JPanel {
         // Highlight start position
         int startRow = maze.getStartRow();
         int startCol = maze.getStartCol();
-        drawSpecialMarker(g2d, startRow, startCol, Color.GREEN, "S");
+        if (maze.isWalkable(startRow, startCol)) {
+            drawSpecialMarker(g2d, startRow, startCol, Color.GREEN, "S");
+        }
         
         // Highlight goal position
         int goalRow = maze.getGoalRow();
         int goalCol = maze.getGoalCol();
-        drawSpecialMarker(g2d, goalRow, goalCol, Color.RED, "G");
+        if (maze.isWalkable(goalRow, goalCol)) {
+            drawSpecialMarker(g2d, goalRow, goalCol, Color.RED, "G");
+        }
     }
     
     private void drawSpecialMarker(Graphics2D g2d, int row, int col, Color color, String text) {
@@ -273,6 +278,12 @@ public class MazePanel extends JPanel {
     public String getToolTipText(java.awt.event.MouseEvent event) {
         Point cell = getCellAt(event.getPoint());
         if (cell != null && maze != null) {
+            if (maze.isStartCell(cell.x, cell.y)) {
+                return String.format("Cell (%d, %d): Start", cell.x, cell.y);
+            }
+            if (maze.isGoalCell(cell.x, cell.y)) {
+                return String.format("Cell (%d, %d): Goal", cell.x, cell.y);
+            }
             int cellType = maze.getCell(cell.x, cell.y);
             String typeName = getCellTypeName(cellType);
             return String.format("Cell (%d, %d): %s", cell.x, cell.y, typeName);

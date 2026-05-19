@@ -11,6 +11,8 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -41,6 +43,8 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JButton newMazeButton;
     private JButton randomizeSeedButton;
     private JButton createFromSeedButton;
+    private JToggleButton setStartButton;
+    private JToggleButton setGoalButton;
     
     private JComboBox<String> generationAlgorithmBox;
     private JComboBox<String> solvingAlgorithmBox;
@@ -49,6 +53,12 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JTextField seedField;
     private JLabel statusLabel;
     private JSlider speedSlider;
+    private EndpointSelection endpointSelection = EndpointSelection.START;
+
+    private enum EndpointSelection {
+        START,
+        GOAL
+    }
 
     // Window persistence
     private static final Preferences prefs = Preferences.userNodeForPackage(SwingMazeView.class);
@@ -195,7 +205,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         panel.setBorder(BorderFactory.createEtchedBorder());
         
         // Main action buttons
-        newMazeButton = createButton("New Maze", "Create a new maze with custom dimensions");
+        newMazeButton = createButton("New Maze", "Create a blank maze workspace with custom dimensions");
         generateButton = createButton("Generate", "Generate a new maze using selected algorithm");
         solveButton = createButton("Solve", "Solve the current maze");
         pauseResumeButton = createButton("Pause", "Pause or resume current operation");
@@ -241,10 +251,32 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         // Reproducible seed
         panel.add(createSeedPanel());
         panel.add(Box.createVerticalStrut(10));
+
+        // Start and goal controls
+        panel.add(createEndpointPanel());
+        panel.add(Box.createVerticalStrut(10));
         
         // Speed control
         panel.add(createSpeedPanel());
         
+        return panel;
+    }
+
+    private JPanel createEndpointPanel() {
+        JPanel panel = new JPanel(new GridLayout(1, 2, 5, 5));
+        panel.setBorder(BorderFactory.createTitledBorder("Endpoints"));
+
+        setStartButton = createEndpointButton("Start", "Set the start cell with the next maze click");
+        setGoalButton = createEndpointButton("Goal", "Set the goal cell with the next maze click");
+        setStartButton.setSelected(true);
+
+        ButtonGroup group = new ButtonGroup();
+        group.add(setStartButton);
+        group.add(setGoalButton);
+
+        panel.add(setStartButton);
+        panel.add(setGoalButton);
+
         return panel;
     }
 
@@ -383,6 +415,14 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         button.setFocusPainted(false);
         return button;
     }
+
+    private JToggleButton createEndpointButton(String text, String tooltip) {
+        JToggleButton button = new JToggleButton(text);
+        button.setToolTipText(tooltip);
+        button.addActionListener(this);
+        button.setFocusPainted(false);
+        return button;
+    }
     
     private void setupEventHandlers() {
         // Window closing
@@ -392,6 +432,15 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
                 saveWindowSettings();
                 controller.shutdown();
                 System.exit(0);
+            }
+        });
+
+        mazePanel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (SwingUtilities.isLeftMouseButton(e)) {
+                    handleMazeCellClick(e.getPoint());
+                }
             }
         });
     }
@@ -416,23 +465,22 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     @Override
     public void updateMaze(Maze maze) {
         if (mazePanel != null) {
-            mazePanel.setMaze(maze);
-            
-            // Update dimensions fields
-            if (maze != null) {
-                SwingUtilities.invokeLater(() -> {
+            runOnEventDispatchThread(() -> {
+                mazePanel.setMaze(maze);
+
+                if (maze != null) {
                     rowsField.setText(String.valueOf(maze.getRows()));
                     columnsField.setText(String.valueOf(maze.getColumns()));
                     seedField.setText(String.valueOf(controller.getCurrentGenerationSeed()));
-                });
-            }
+                }
+            });
         }
     }
     
     @Override
     public void refresh() {
         if (mazePanel != null) {
-            SwingUtilities.invokeLater(() -> mazePanel.repaint());
+            runOnEventDispatchThread(() -> mazePanel.repaint());
         }
     }
     
@@ -621,6 +669,8 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         seedField.setEnabled(!isBusy);
         randomizeSeedButton.setEnabled(!isBusy);
         createFromSeedButton.setEnabled(!isBusy);
+        setStartButton.setEnabled(!isBusy);
+        setGoalButton.setEnabled(!isBusy);
     }
     
     private void updateResetButton() {
@@ -719,6 +769,10 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             handleRandomizeSeedAction();
         } else if (source == createFromSeedButton) {
             handleCreateFromSeedAction();
+        } else if (source == setStartButton) {
+            endpointSelection = EndpointSelection.START;
+        } else if (source == setGoalButton) {
+            endpointSelection = EndpointSelection.GOAL;
         } else if (source == generationAlgorithmBox) {
             handleGenerationAlgorithmChange();
         } else if (source == solvingAlgorithmBox) {
@@ -730,7 +784,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         int[] dimensions = getMazeDimensions();
         if (dimensions.length == 2 && applySeedFromField()) {
             controller.createNewMaze(dimensions[0], dimensions[1]);
-            statusLabel.setText("New maze created");
+            statusLabel.setText("New blank maze created");
         }
     }
 
@@ -771,6 +825,31 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         if (dimensions.length == 2 && seed != null) {
             controller.createMazeFromSeed(dimensions[0], dimensions[1], seed);
             statusLabel.setText("Generating maze from seed " + seed + "...");
+        }
+    }
+
+    private void handleMazeCellClick(Point clickPoint) {
+        Point cell = mazePanel.getCellAt(clickPoint);
+        Maze maze = controller.getMaze();
+        if (cell == null || maze == null) {
+            return;
+        }
+
+        if (controller.isBusy()) {
+            statusLabel.setText("Finish the current operation before changing endpoints");
+            return;
+        }
+
+        boolean updated = endpointSelection == EndpointSelection.START
+            ? controller.setStartCell(cell.x, cell.y)
+            : controller.setGoalCell(cell.x, cell.y);
+
+        if (updated) {
+            String endpointName = endpointSelection == EndpointSelection.START ? "Start" : "Goal";
+            statusLabel.setText(endpointName + " set to (" + cell.x + ", " + cell.y + ")");
+        } else {
+            String endpointName = endpointSelection == EndpointSelection.START ? "start" : "goal";
+            statusLabel.setText("Choose a different open cell for the " + endpointName);
         }
     }
     
@@ -826,6 +905,14 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         String selected = (String) solvingAlgorithmBox.getSelectedItem();
         if (selected != null) {
             controller.setSolvingAlgorithm(selected);
+        }
+    }
+
+    private void runOnEventDispatchThread(Runnable action) {
+        if (SwingUtilities.isEventDispatchThread()) {
+            action.run();
+        } else {
+            SwingUtilities.invokeLater(action);
         }
     }
 }

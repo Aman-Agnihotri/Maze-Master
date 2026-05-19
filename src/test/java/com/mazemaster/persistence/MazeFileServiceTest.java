@@ -20,6 +20,8 @@ class MazeFileServiceTest {
         Path saveFile = tempDir.resolve("round-trip.maze");
 
         maze.setGenerationMetadata(987654321L, "Prim");
+        maze.setStartPosition(1, 2);
+        maze.setGoalPosition(3, 2);
         maze.setCell(1, 1, Maze.EMPTY);
         maze.setCell(1, 2, Maze.PATH);
         maze.setCell(2, 2, Maze.VISITED);
@@ -32,6 +34,10 @@ class MazeFileServiceTest {
         assertThat(loadedMaze.getColumns()).isEqualTo(5);
         assertThat(loadedMaze.getGenerationSeed()).isEqualTo(987654321L);
         assertThat(loadedMaze.getGenerationAlgorithm()).isEqualTo("Prim");
+        assertThat(loadedMaze.getStartRow()).isEqualTo(1);
+        assertThat(loadedMaze.getStartCol()).isEqualTo(2);
+        assertThat(loadedMaze.getGoalRow()).isEqualTo(3);
+        assertThat(loadedMaze.getGoalCol()).isEqualTo(2);
         assertThat(loadedMaze.getGrid()).isDeepEqualTo(maze.getGrid());
     }
 
@@ -44,5 +50,31 @@ class MazeFileServiceTest {
         assertThatThrownBy(() -> service.load(saveFile))
             .isInstanceOf(IOException.class)
             .hasMessageContaining("incomplete");
+    }
+
+    @Test
+    void shouldLoadVersionTwoFilesWithDefaultEndpoints(@TempDir Path tempDir) throws IOException {
+        MazeFileService service = new MazeFileService();
+        Path saveFile = tempDir.resolve("version-two.maze");
+        Files.writeString(saveFile, """
+            MAZE_MASTER_SAVE 2
+            5 5
+            seed 42
+            algorithm REZT
+            1 1 1 1 1
+            1 3 3 3 1
+            1 1 1 3 1
+            1 3 3 3 1
+            1 1 1 1 1
+            """);
+
+        Maze loadedMaze = service.load(saveFile);
+
+        assertThat(loadedMaze.getGenerationSeed()).isEqualTo(42L);
+        assertThat(loadedMaze.getGenerationAlgorithm()).isEqualTo("DFS");
+        assertThat(loadedMaze.getStartRow()).isEqualTo(1);
+        assertThat(loadedMaze.getStartCol()).isEqualTo(1);
+        assertThat(loadedMaze.getGoalRow()).isEqualTo(3);
+        assertThat(loadedMaze.getGoalCol()).isEqualTo(3);
     }
 }
