@@ -43,8 +43,6 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JButton newMazeButton;
     private JButton randomizeSeedButton;
     private JButton createFromSeedButton;
-    private JToggleButton setStartButton;
-    private JToggleButton setGoalButton;
     
     private JComboBox<String> generationAlgorithmBox;
     private JComboBox<String> solvingAlgorithmBox;
@@ -53,9 +51,10 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JTextField seedField;
     private JLabel statusLabel;
     private JSlider speedSlider;
-    private EndpointSelection endpointSelection = EndpointSelection.START;
+    private EndpointSelection selectedEndpoint = EndpointSelection.NONE;
 
     private enum EndpointSelection {
+        NONE,
         START,
         GOAL
     }
@@ -252,31 +251,9 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         panel.add(createSeedPanel());
         panel.add(Box.createVerticalStrut(10));
 
-        // Start and goal controls
-        panel.add(createEndpointPanel());
-        panel.add(Box.createVerticalStrut(10));
-        
         // Speed control
         panel.add(createSpeedPanel());
         
-        return panel;
-    }
-
-    private JPanel createEndpointPanel() {
-        JPanel panel = new JPanel(new GridLayout(1, 2, 5, 5));
-        panel.setBorder(BorderFactory.createTitledBorder("Endpoints"));
-
-        setStartButton = createEndpointButton("Start", "Set the start cell with the next maze click");
-        setGoalButton = createEndpointButton("Goal", "Set the goal cell with the next maze click");
-        setStartButton.setSelected(true);
-
-        ButtonGroup group = new ButtonGroup();
-        group.add(setStartButton);
-        group.add(setGoalButton);
-
-        panel.add(setStartButton);
-        panel.add(setGoalButton);
-
         return panel;
     }
 
@@ -416,14 +393,6 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         return button;
     }
 
-    private JToggleButton createEndpointButton(String text, String tooltip) {
-        JToggleButton button = new JToggleButton(text);
-        button.setToolTipText(tooltip);
-        button.addActionListener(this);
-        button.setFocusPainted(false);
-        return button;
-    }
-    
     private void setupEventHandlers() {
         // Window closing
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -466,6 +435,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     public void updateMaze(Maze maze) {
         if (mazePanel != null) {
             runOnEventDispatchThread(() -> {
+                clearEndpointSelection();
                 mazePanel.setMaze(maze);
 
                 if (maze != null) {
@@ -493,6 +463,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     @Override
     public void onGenerationStarted() {
         SwingUtilities.invokeLater(() -> {
+            clearEndpointSelection();
             statusLabel.setText("Generating maze with seed " + controller.getCurrentGenerationSeed() + "...");
             pauseResumeButton.setText("Pause");
             pauseResumeButton.setEnabled(true);
@@ -513,6 +484,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     @Override
     public void onSolvingStarted() {
         SwingUtilities.invokeLater(() -> {
+            clearEndpointSelection();
             statusLabel.setText("Solving maze...");
             pauseResumeButton.setText("Pause");
             pauseResumeButton.setEnabled(true);
@@ -669,8 +641,6 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         seedField.setEnabled(!isBusy);
         randomizeSeedButton.setEnabled(!isBusy);
         createFromSeedButton.setEnabled(!isBusy);
-        setStartButton.setEnabled(!isBusy);
-        setGoalButton.setEnabled(!isBusy);
     }
     
     private void updateResetButton() {
@@ -769,10 +739,6 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             handleRandomizeSeedAction();
         } else if (source == createFromSeedButton) {
             handleCreateFromSeedAction();
-        } else if (source == setStartButton) {
-            endpointSelection = EndpointSelection.START;
-        } else if (source == setGoalButton) {
-            endpointSelection = EndpointSelection.GOAL;
         } else if (source == generationAlgorithmBox) {
             handleGenerationAlgorithmChange();
         } else if (source == solvingAlgorithmBox) {
@@ -840,16 +806,53 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             return;
         }
 
-        boolean updated = endpointSelection == EndpointSelection.START
+        if (maze.isStartCell(cell.x, cell.y) && maze.isWalkable(cell.x, cell.y)) {
+            selectEndpoint(EndpointSelection.START);
+            statusLabel.setText("Start selected - click an open cell to move it");
+            return;
+        }
+
+        if (maze.isGoalCell(cell.x, cell.y) && maze.isWalkable(cell.x, cell.y)) {
+            selectEndpoint(EndpointSelection.GOAL);
+            statusLabel.setText("Goal selected - click an open cell to move it");
+            return;
+        }
+
+        if (selectedEndpoint == EndpointSelection.NONE) {
+            statusLabel.setText("Click the start or goal marker first");
+            return;
+        }
+
+        EndpointSelection endpointToMove = selectedEndpoint;
+        boolean updated = endpointToMove == EndpointSelection.START
             ? controller.setStartCell(cell.x, cell.y)
             : controller.setGoalCell(cell.x, cell.y);
 
         if (updated) {
-            String endpointName = endpointSelection == EndpointSelection.START ? "Start" : "Goal";
+            String endpointName = endpointToMove == EndpointSelection.START ? "Start" : "Goal";
             statusLabel.setText(endpointName + " set to (" + cell.x + ", " + cell.y + ")");
+            clearEndpointSelection();
         } else {
-            String endpointName = endpointSelection == EndpointSelection.START ? "start" : "goal";
+            String endpointName = endpointToMove == EndpointSelection.START ? "start" : "goal";
             statusLabel.setText("Choose a different open cell for the " + endpointName);
+        }
+    }
+
+    private void selectEndpoint(EndpointSelection endpoint) {
+        selectedEndpoint = endpoint;
+        if (endpoint == EndpointSelection.START) {
+            mazePanel.selectStartEndpoint();
+        } else if (endpoint == EndpointSelection.GOAL) {
+            mazePanel.selectGoalEndpoint();
+        } else {
+            mazePanel.clearEndpointSelection();
+        }
+    }
+
+    private void clearEndpointSelection() {
+        selectedEndpoint = EndpointSelection.NONE;
+        if (mazePanel != null) {
+            mazePanel.clearEndpointSelection();
         }
     }
     

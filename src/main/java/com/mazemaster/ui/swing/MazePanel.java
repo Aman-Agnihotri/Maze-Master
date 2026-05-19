@@ -20,6 +20,8 @@ public class MazePanel extends JPanel {
     // Rendering settings
     private boolean antialiasing = true;
     private boolean showGrid = false;
+    private boolean startEndpointSelected = false;
+    private boolean goalEndpointSelected = false;
     
     public MazePanel(Color[] colors) {
         this.colors = colors.clone();
@@ -85,6 +87,24 @@ public class MazePanel extends JPanel {
     
     public void setShowGrid(boolean showGrid) {
         this.showGrid = showGrid;
+        repaint();
+    }
+
+    public void selectStartEndpoint() {
+        startEndpointSelected = true;
+        goalEndpointSelected = false;
+        repaint();
+    }
+
+    public void selectGoalEndpoint() {
+        startEndpointSelected = false;
+        goalEndpointSelected = true;
+        repaint();
+    }
+
+    public void clearEndpointSelection() {
+        startEndpointSelected = false;
+        goalEndpointSelected = false;
         repaint();
     }
     
@@ -194,18 +214,18 @@ public class MazePanel extends JPanel {
         int startRow = maze.getStartRow();
         int startCol = maze.getStartCol();
         if (maze.isWalkable(startRow, startCol)) {
-            drawSpecialMarker(g2d, startRow, startCol, Color.GREEN, "S");
+            drawSpecialMarker(g2d, startRow, startCol, Color.GREEN, "S", startEndpointSelected);
         }
         
         // Highlight goal position
         int goalRow = maze.getGoalRow();
         int goalCol = maze.getGoalCol();
         if (maze.isWalkable(goalRow, goalCol)) {
-            drawSpecialMarker(g2d, goalRow, goalCol, Color.RED, "G");
+            drawSpecialMarker(g2d, goalRow, goalCol, Color.RED, "G", goalEndpointSelected);
         }
     }
     
-    private void drawSpecialMarker(Graphics2D g2d, int row, int col, Color color, String text) {
+    private void drawSpecialMarker(Graphics2D g2d, int row, int col, Color color, String text, boolean selected) {
         int x = col * cellSize;
         int y = row * cellSize;
         
@@ -213,6 +233,20 @@ public class MazePanel extends JPanel {
         g2d.setColor(color);
         int margin = Math.max(1, cellSize / 6);
         g2d.fillOval(x + margin, y + margin, cellSize - 2 * margin, cellSize - 2 * margin);
+
+        if (selected) {
+            Stroke originalStroke = g2d.getStroke();
+            g2d.setColor(Color.BLACK);
+            g2d.setStroke(new BasicStroke(Math.max(2, cellSize / 8f)));
+            int ringMargin = Math.max(1, cellSize / 10);
+            g2d.drawOval(
+                x + ringMargin,
+                y + ringMargin,
+                cellSize - 2 * ringMargin,
+                cellSize - 2 * ringMargin
+            );
+            g2d.setStroke(originalStroke);
+        }
         
         // Draw text if cell is large enough
         if (cellSize >= 16) {

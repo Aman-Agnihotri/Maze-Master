@@ -137,7 +137,7 @@
 5. **Create Workspace**: Click "New Maze" to create a blank maze with current dimensions
 6. **Generate Maze**: Click "Generate" and watch real-time creation
 7. **Pause/Resume**: Use "Pause" button to pause generation at any time
-8. **Set Endpoints**: Select Start or Goal, then click an open maze cell
+8. **Set Endpoints**: Click the start or goal marker, then click an open maze cell to move it
 9. **Select Solving Algorithm**: Choose pathfinding method
 10. **Solve Maze**: Click "Solve" to watch the algorithm work
 11. **Adjust Settings**: Use speed slider and zoom controls
@@ -148,7 +148,7 @@
 - **Mouse Wheel**: Zoom in/out (zoom level persists)
 - **Seed Field**: Reuse the same seed, generation algorithm, and dimensions to recreate a maze
 - **Create Seed Button**: Creates a fresh maze from the entered seed and current dimensions
-- **Endpoint Buttons**: Choose whether maze clicks update the start cell or goal cell
+- **Interactive Endpoints**: Click the start or goal marker to select it, then click an open cell to move it
 - **Generate Button**: Runs the selected generation algorithm on the current maze workspace
 - **Pause/Resume Button**: Pause any operation and resume from exact same state
 - **Reset Button**: Context-aware reset (clears solution or resets to blank)
