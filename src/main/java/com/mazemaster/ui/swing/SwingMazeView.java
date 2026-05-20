@@ -2,6 +2,7 @@
 package com.mazemaster.ui.swing;
 
 import com.mazemaster.controller.MazeController;
+import com.mazemaster.export.AnimatedGifExporter;
 import com.mazemaster.model.Maze;
 import com.mazemaster.ui.MazeView;
 
@@ -16,6 +17,8 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -30,6 +33,7 @@ import java.awt.event.ComponentEvent;
 public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     
     private final transient MazeController controller;
+    private final transient AnimatedGifExporter gifExporter = new AnimatedGifExporter();
     
     // UI Components
     private MazePanel mazePanel;
@@ -40,6 +44,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JButton saveButton;
     private JButton loadButton;
     private JButton exportButton;
+    private JButton exportGifButton;
     private JButton newMazeButton;
     private JButton randomizeSeedButton;
     private JButton createFromSeedButton;
@@ -51,6 +56,9 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JTextField seedField;
     private JLabel statusLabel;
     private JSlider speedSlider;
+    private final transient List<BufferedImage> animationFrames = new ArrayList<>();
+    private boolean recordingAnimation = false;
+    private long lastAnimationFrameCapturedAt = 0L;
     private EndpointSelection selectedEndpoint = EndpointSelection.NONE;
 
     private enum EndpointSelection {
@@ -68,6 +76,9 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private static final String PREF_WINDOW_MAXIMIZED = "window.maximized";
     private static final String PREF_ZOOM_LEVEL = "maze.zoom.level";
     private static final String PREF_ANIMATION_SPEED = "animation.speed";
+    private static final int GIF_FRAME_DELAY_MS = 80;
+    private static final int MAX_GIF_FRAMES = 240;
+    private static final int MAX_GIF_DIMENSION = 900;
     
     // Color scheme
     private final Color[] mazeColors = {
@@ -225,10 +236,12 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         saveButton = createButton("Save", "Save current maze to file");
         loadButton = createButton("Load", "Load maze from file");
         exportButton = createButton("Export", "Export maze as image");
+        exportGifButton = createButton("GIF", "Export the last generation or solving animation as GIF");
         
         panel.add(saveButton);
         panel.add(loadButton);
         panel.add(exportButton);
+        panel.add(exportGifButton);
         
         return panel;
     }
@@ -450,7 +463,10 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     @Override
     public void refresh() {
         if (mazePanel != null) {
-            runOnEventDispatchThread(() -> mazePanel.repaint());
+            runOnEventDispatchThread(() -> {
+                mazePanel.repaint();
+                captureAnimationFrame(false);
+            });
         }
     }
     
@@ -464,6 +480,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     public void onGenerationStarted() {
         SwingUtilities.invokeLater(() -> {
             clearEndpointSelection();
+            startAnimationCapture(false);
             statusLabel.setText("Generating maze with seed " + controller.getCurrentGenerationSeed() + "...");
             pauseResumeButton.setText("Pause");
             pauseResumeButton.setEnabled(true);
@@ -474,6 +491,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     @Override
     public void onGenerationCompleted() {
         SwingUtilities.invokeLater(() -> {
+            stopAnimationCapture();
             statusLabel.setText("Maze generation completed (seed: " + controller.getCurrentGenerationSeed() + ")");
             pauseResumeButton.setText("Pause");
             pauseResumeButton.setEnabled(false);
@@ -485,6 +503,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     public void onSolvingStarted() {
         SwingUtilities.invokeLater(() -> {
             clearEndpointSelection();
+            startAnimationCapture(true);
             statusLabel.setText("Solving maze...");
             pauseResumeButton.setText("Pause");
             pauseResumeButton.setEnabled(true);
@@ -495,6 +514,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     @Override
     public void onSolvingCompleted(boolean solved) {
         SwingUtilities.invokeLater(() -> {
+            stopAnimationCapture();
             statusLabel.setText(solved ? "Maze solved!" : "No solution found");
             pauseResumeButton.setText("Pause");
             pauseResumeButton.setEnabled(false);
@@ -631,6 +651,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         saveButton.setEnabled(!isBusy && controller.getMaze() != null);
         loadButton.setEnabled(!isBusy);
         exportButton.setEnabled(!isBusy && controller.getMaze() != null);
+        exportGifButton.setEnabled(!isBusy && !animationFrames.isEmpty());
     }
     
     private void updateAlgorithmControls(boolean isBusy) {
@@ -710,6 +731,24 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         
         return null;
     }
+
+    private String getGifExportFilename() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Export Maze Animation");
+        fileChooser.setFileFilter(new FileNameExtensionFilter("GIF Images", "gif"));
+        fileChooser.setSelectedFile(new File("maze-animation.gif"));
+
+        int result = fileChooser.showSaveDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            return ensureFileExtension(fileChooser.getSelectedFile().getAbsolutePath(), ".gif");
+        }
+
+        return null;
+    }
+
+    private String ensureFileExtension(String filename, String extension) {
+        return filename.toLowerCase().endsWith(extension) ? filename : filename + extension;
+    }
     
     // =========================
     // ActionListener Implementation
@@ -735,6 +774,8 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             controller.loadMaze();
         } else if (source == exportButton) {
             handleExportAction();
+        } else if (source == exportGifButton) {
+            handleExportGifAction();
         } else if (source == randomizeSeedButton) {
             handleRandomizeSeedAction();
         } else if (source == createFromSeedButton) {
@@ -895,6 +936,89 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
                 showMessage("Failed to export maze", true);
             }
         }
+    }
+
+    private void handleExportGifAction() {
+        if (animationFrames.isEmpty()) {
+            showMessage("No animation has been recorded yet. Generate or solve a maze first.", true);
+            return;
+        }
+
+        String filename = getGifExportFilename();
+        if (filename == null) {
+            return;
+        }
+
+        try {
+            gifExporter.export(List.copyOf(animationFrames), Path.of(filename), GIF_FRAME_DELAY_MS);
+            statusLabel.setText("Maze animation exported to " + filename);
+        } catch (IOException | IllegalArgumentException e) {
+            e.printStackTrace();
+            showMessage("Failed to export GIF: " + e.getMessage(), true);
+        }
+    }
+
+    private void startAnimationCapture(boolean captureInitialFrame) {
+        animationFrames.clear();
+        recordingAnimation = true;
+        lastAnimationFrameCapturedAt = 0L;
+        if (captureInitialFrame) {
+            captureAnimationFrame(true);
+        }
+    }
+
+    private void stopAnimationCapture() {
+        captureAnimationFrame(true);
+        recordingAnimation = false;
+    }
+
+    private void captureAnimationFrame(boolean force) {
+        if ((!recordingAnimation && !force) || mazePanel == null || controller.getMaze() == null) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        if (!force && now - lastAnimationFrameCapturedAt < GIF_FRAME_DELAY_MS) {
+            return;
+        }
+
+        BufferedImage frame = renderAnimationFrame();
+        if (frame == null) {
+            return;
+        }
+
+        if (animationFrames.size() < MAX_GIF_FRAMES) {
+            animationFrames.add(frame);
+        } else if (force) {
+            animationFrames.set(animationFrames.size() - 1, frame);
+        }
+        lastAnimationFrameCapturedAt = now;
+    }
+
+    private BufferedImage renderAnimationFrame() {
+        Dimension sourceSize = mazePanel.getPreferredSize();
+        if (sourceSize.width <= 0 || sourceSize.height <= 0) {
+            return null;
+        }
+
+        double scale = Math.min(
+            1.0,
+            Math.min(
+                MAX_GIF_DIMENSION / (double) sourceSize.width,
+                MAX_GIF_DIMENSION / (double) sourceSize.height
+            )
+        );
+        int width = Math.max(1, (int) Math.round(sourceSize.width * scale));
+        int height = Math.max(1, (int) Math.round(sourceSize.height * scale));
+
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = image.createGraphics();
+        graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        graphics.scale(scale, scale);
+        mazePanel.paint(graphics);
+        graphics.dispose();
+        return image;
     }
     
     private void handleGenerationAlgorithmChange() {

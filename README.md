@@ -45,6 +45,7 @@
 - 💾 **Advanced File Operations**
   - Save/Load maze states (versioned text format)
   - Export mazes as high-quality PNG images
+  - Export the latest generation or solving animation as GIF
   - File dialogs with format selection
   - Comprehensive error handling
 
@@ -141,7 +142,7 @@
 9. **Select Solving Algorithm**: Choose pathfinding method
 10. **Solve Maze**: Click "Solve" to watch the algorithm work
 11. **Adjust Settings**: Use speed slider and zoom controls
-12. **Save/Export**: Preserve your maze or export as image
+12. **Save/Export**: Preserve your maze or export image/GIF output
 
 ### Advanced Controls
 
@@ -150,6 +151,7 @@
 - **Create Seed Button**: Creates a fresh maze from the entered seed and current dimensions
 - **Interactive Endpoints**: Click the start or goal marker to select it, then click an open cell to move it
 - **Generate Button**: Runs the selected generation algorithm on the current maze workspace
+- **GIF Button**: Exports the most recent generation or solving animation
 - **Pause/Resume Button**: Pause any operation and resume from exact same state
 - **Reset Button**: Context-aware reset (clears solution or resets to blank)
 - **New Maze Button**: Creates a blank maze workspace with current dimensions
