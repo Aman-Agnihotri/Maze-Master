@@ -2,6 +2,7 @@
 package com.mazemaster.ui;
 
 import com.mazemaster.model.Maze;
+import com.mazemaster.model.MazeMetrics;
 import java.awt.Point;
 import java.util.List;
 
@@ -148,6 +149,14 @@ public interface MazeView {
      * @param isSolving True if solving is in progress
      */
     void updateControlsState(boolean isGenerating, boolean isSolving);
+
+    /**
+     * Update displayed generation and solving metrics.
+     * @param metrics Latest runtime metrics snapshot
+     */
+    default void updateMetrics(MazeMetrics metrics) {
+        // Views that do not display metrics can ignore this callback.
+    }
     
     // =========================
     // Export Methods

@@ -4,6 +4,7 @@ package com.mazemaster.ui.swing;
 import com.mazemaster.controller.MazeController;
 import com.mazemaster.export.AnimatedGifExporter;
 import com.mazemaster.model.Maze;
+import com.mazemaster.model.MazeMetrics;
 import com.mazemaster.ui.MazeView;
 
 import javax.imageio.ImageIO;
@@ -20,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import java.util.prefs.Preferences;
@@ -55,6 +57,13 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JTextField columnsField;
     private JTextField seedField;
     private JLabel statusLabel;
+    private JLabel generationTimeValueLabel;
+    private JLabel solvingTimeValueLabel;
+    private JLabel walkableCellsValueLabel;
+    private JLabel exploredCellsValueLabel;
+    private JLabel exploredPercentValueLabel;
+    private JLabel pathLengthValueLabel;
+    private JLabel solvedValueLabel;
     private JSlider speedSlider;
     private final transient List<BufferedImage> animationFrames = new ArrayList<>();
     private boolean recordingAnimation = false;
@@ -264,6 +273,10 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         panel.add(createSeedPanel());
         panel.add(Box.createVerticalStrut(10));
 
+        // Runtime metrics
+        panel.add(createMetricsPanel());
+        panel.add(Box.createVerticalStrut(10));
+
         // Speed control
         panel.add(createSpeedPanel());
         
@@ -304,6 +317,54 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         panel.add(createFromSeedButton, gbc);
 
         return panel;
+    }
+
+    private JPanel createMetricsPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        panel.setBorder(BorderFactory.createTitledBorder("Metrics"));
+
+        gbc.insets = new Insets(3, 5, 3, 5);
+        gbc.anchor = GridBagConstraints.WEST;
+
+        generationTimeValueLabel = createMetricValueLabel();
+        solvingTimeValueLabel = createMetricValueLabel();
+        walkableCellsValueLabel = createMetricValueLabel();
+        exploredCellsValueLabel = createMetricValueLabel();
+        exploredPercentValueLabel = createMetricValueLabel();
+        pathLengthValueLabel = createMetricValueLabel();
+        solvedValueLabel = createMetricValueLabel();
+
+        addMetricRow(panel, gbc, 0, "Generation:", generationTimeValueLabel);
+        addMetricRow(panel, gbc, 1, "Solving:", solvingTimeValueLabel);
+        addMetricRow(panel, gbc, 2, "Walkable:", walkableCellsValueLabel);
+        addMetricRow(panel, gbc, 3, "Explored:", exploredCellsValueLabel);
+        addMetricRow(panel, gbc, 4, "Explored %:", exploredPercentValueLabel);
+        addMetricRow(panel, gbc, 5, "Path:", pathLengthValueLabel);
+        addMetricRow(panel, gbc, 6, "Result:", solvedValueLabel);
+
+        updateMetrics(MazeMetrics.empty());
+        return panel;
+    }
+
+    private JLabel createMetricValueLabel() {
+        JLabel label = new JLabel("-");
+        label.setHorizontalAlignment(SwingConstants.RIGHT);
+        return label;
+    }
+
+    private void addMetricRow(JPanel panel, GridBagConstraints gbc, int row, String name, JLabel valueLabel) {
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;
+        panel.add(new JLabel(name), gbc);
+
+        gbc.gridx = 1;
+        gbc.gridy = row;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(valueLabel, gbc);
     }
     
     private JPanel createAlgorithmPanel() {
@@ -438,6 +499,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         
         // Update control states
         updateControlsState(controller.isGenerating(), controller.isSolving());
+        updateMetrics(controller.getMetrics());
     }
     
     // =========================
@@ -642,6 +704,53 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             updateResetButton();
             updatePauseResumeButton(isBusy, isAnyPaused);
         });
+    }
+
+    @Override
+    public void updateMetrics(MazeMetrics metrics) {
+        SwingUtilities.invokeLater(() -> {
+            if (generationTimeValueLabel == null) {
+                return;
+            }
+
+            generationTimeValueLabel.setText(formatDuration(metrics.generationTimeMillis()));
+            solvingTimeValueLabel.setText(formatDuration(metrics.solvingTimeMillis()));
+            walkableCellsValueLabel.setText(formatCount(metrics.walkableCells()));
+            exploredCellsValueLabel.setText(String.valueOf(metrics.exploredCells()));
+            exploredPercentValueLabel.setText(formatExploredPercentage(metrics));
+            pathLengthValueLabel.setText(metrics.solved() ? String.valueOf(metrics.pathLength()) : "-");
+            solvedValueLabel.setText(formatSolvedState(metrics));
+        });
+    }
+
+    private String formatDuration(long durationMillis) {
+        if (durationMillis == MazeMetrics.NOT_RECORDED) {
+            return "-";
+        }
+        if (durationMillis < 1000) {
+            return durationMillis + " ms";
+        }
+        return String.format(Locale.ROOT, "%.2f s", durationMillis / 1000.0);
+    }
+
+    private String formatCount(int count) {
+        return count == 0 ? "-" : String.valueOf(count);
+    }
+
+    private String formatExploredPercentage(MazeMetrics metrics) {
+        if (metrics.walkableCells() == 0 || metrics.exploredCells() == 0) {
+            return "-";
+        }
+
+        double exploredPercentage = metrics.exploredCells() * 100.0 / metrics.walkableCells();
+        return String.format(Locale.ROOT, "%.1f%%", exploredPercentage);
+    }
+
+    private String formatSolvedState(MazeMetrics metrics) {
+        if (!metrics.solvingAttempted()) {
+            return "-";
+        }
+        return metrics.solved() ? "Solved" : "No path";
     }
     
     private void updateMainButtons(boolean isBusy) {

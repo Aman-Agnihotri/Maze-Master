@@ -5,6 +5,7 @@ import com.mazemaster.model.Maze;
 import com.mazemaster.generation.MazeGenerator;
 import com.mazemaster.generation.MazeGenerationListener;
 import com.mazemaster.persistence.MazeFileService;
+import com.mazemaster.model.MazeMetrics;
 import com.mazemaster.solving.MazeSolver;
 import com.mazemaster.solving.MazeSolvingListener;
 import com.mazemaster.ui.MazeView;
@@ -15,6 +16,8 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,6 +56,12 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     // Background operations
     private Future<?> generationTask;
     private Future<?> solvingTask;
+
+    // Metrics
+    private volatile MazeMetrics metrics = MazeMetrics.empty();
+    private volatile long generationStartedAtNanos;
+    private volatile long solvingStartedAtNanos;
+    private final Set<Point> exploredCells = ConcurrentHashMap.newKeySet();
     
     // Configuration
     private String currentGenerationAlgorithm = "DFS";
@@ -80,6 +89,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         this.view = view;
         if (view != null) {
             view.updateMaze(maze);
+            view.updateMetrics(metrics);
         }
     }
     
@@ -95,6 +105,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         
         this.maze = new Maze(rows, columns);
         maze.setGenerationMetadata(currentGenerationSeed, currentGenerationAlgorithm);
+        resetAllMetrics();
         
         if (view != null) {
             view.updateMaze(maze);
@@ -124,6 +135,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         pauseGeneration.set(false);
         generator.setRandomSeed(currentGenerationSeed);
         maze.setGenerationMetadata(currentGenerationSeed, currentGenerationAlgorithm);
+        generationStartedAtNanos = System.nanoTime();
+        resetAllMetrics();
         
         generationTask = operationExecutor.submit(() -> {
             try {
@@ -154,6 +167,10 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         isSolvingPaused = false;
         stopSolving.set(false);
         pauseSolving.set(false);
+        solvingStartedAtNanos = System.nanoTime();
+        exploredCells.clear();
+        metrics = metrics.withSolvingStarted();
+        notifyMetricsChanged();
         
         solvingTask = operationExecutor.submit(() -> {
             try {
@@ -261,12 +278,15 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             if (wasGenerationPaused) {
                 // A paused generation leaves a partial maze. Reset to a blank structure for a clean start.
                 maze.reset();
+                resetAllMetrics();
             } else if (wasSolvingPaused || isMazeFullyGenerated()) {
                 // Solving paused OR maze is fully generated: clear only solver markings.
                 maze.resetSolution();
+                clearSolvingMetrics();
             } else {
                 // Blank or incomplete idle maze: reset to all walls.
                 maze.reset();
+                resetAllMetrics();
             }
 
             updateViewAfterMazeReset();
@@ -315,6 +335,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             }
             
             maze.resetSolution();
+            clearSolvingMetrics();
             if (view != null) {
                 view.updateMaze(maze);
                 view.refresh();
@@ -325,6 +346,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     public void clearSolution() {
         if (!isGenerating && !isSolving && maze != null) {
             maze.resetSolution();
+            clearSolvingMetrics();
             if (view != null) {
                 view.updateMaze(maze);
                 view.refresh();
@@ -374,6 +396,9 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             if (generator.getAvailableAlgorithms().contains(loadedAlgorithm)) {
                 currentGenerationAlgorithm = loadedAlgorithm;
             }
+            resetAllMetrics();
+            metrics = metrics.withWalkableCells(countWalkableCells());
+            notifyMetricsChanged();
             
             if (view != null) {
                 view.updateMaze(maze);
@@ -444,6 +469,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     public String getCurrentGenerationAlgorithm() { return currentGenerationAlgorithm; }
     public String getCurrentSolvingAlgorithm() { return currentSolvingAlgorithm; }
     public long getCurrentGenerationSeed() { return currentGenerationSeed; }
+    public MazeMetrics getMetrics() { return metrics; }
     
     public java.util.Set<String> getAvailableGenerationAlgorithms() {
         return generator.getAvailableAlgorithms();
@@ -475,6 +501,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     public void onGenerationComplete() {
         isGenerating = false;
         isGenerationPaused = false;
+        metrics = metrics.withGenerationTime(elapsedMillis(generationStartedAtNanos), countWalkableCells());
+        notifyMetricsChanged();
         if (view != null) {
             view.onGenerationCompleted();
         }
@@ -486,6 +514,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     
     @Override
     public void onCellExplored(int row, int col) {
+        recordExploredCell(row, col);
         if (view != null) {
             view.onCellChanged(row, col, maze.getCell(row, col));
             view.refresh();
@@ -502,6 +531,8 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     
     @Override
     public void onPathFound(List<Point> path) {
+        metrics = metrics.withPathLength(path.size());
+        notifyMetricsChanged();
         if (view != null) {
             view.onPathFound(path);
         }
@@ -511,6 +542,9 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     public void onSolvingComplete(boolean solved) {
         isSolving = false;
         isSolvingPaused = false;
+        int pathLength = solved && metrics.pathLength() == 0 ? countFinalPathCells() : metrics.pathLength();
+        metrics = metrics.withSolvingComplete(elapsedMillis(solvingStartedAtNanos), solved, pathLength);
+        notifyMetricsChanged();
         if (view != null) {
             view.onSolvingCompleted(solved);
         }
@@ -570,11 +604,79 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
 
         maze.resetSolution();
         boolean updated = startCell ? maze.setStartPosition(row, col) : maze.setGoalPosition(row, col);
+        if (updated) {
+            clearSolvingMetrics();
+        }
         if (updated && view != null) {
             view.updateMaze(maze);
             view.refresh();
         }
         return updated;
+    }
+
+    private void resetAllMetrics() {
+        exploredCells.clear();
+        metrics = MazeMetrics.empty();
+        notifyMetricsChanged();
+    }
+
+    private void clearSolvingMetrics() {
+        exploredCells.clear();
+        metrics = metrics.withoutSolvingMetrics();
+        notifyMetricsChanged();
+    }
+
+    private void recordExploredCell(int row, int col) {
+        if (exploredCells.add(new Point(row, col))) {
+            metrics = metrics.withExploredCells(exploredCells.size());
+            notifyMetricsChanged();
+        }
+    }
+
+    private long elapsedMillis(long startedAtNanos) {
+        if (startedAtNanos == 0L) {
+            return 0L;
+        }
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos);
+    }
+
+    private int countFinalPathCells() {
+        if (maze == null) {
+            return 0;
+        }
+
+        int pathCells = 0;
+        for (int row = 0; row < maze.getRows(); row++) {
+            for (int col = 0; col < maze.getColumns(); col++) {
+                int cell = maze.getCell(row, col);
+                if (cell == Maze.PATH || cell == Maze.START) {
+                    pathCells++;
+                }
+            }
+        }
+        return pathCells;
+    }
+
+    private int countWalkableCells() {
+        if (maze == null) {
+            return 0;
+        }
+
+        int walkableCells = 0;
+        for (int row = 0; row < maze.getRows(); row++) {
+            for (int col = 0; col < maze.getColumns(); col++) {
+                if (maze.isWalkable(row, col)) {
+                    walkableCells++;
+                }
+            }
+        }
+        return walkableCells;
+    }
+
+    private void notifyMetricsChanged() {
+        if (view != null) {
+            view.updateMetrics(metrics);
+        }
     }
 
     private void waitForTask(Future<?> task) {

@@ -1,6 +1,7 @@
 package com.mazemaster.controller;
 
 import com.mazemaster.model.Maze;
+import com.mazemaster.model.MazeMetrics;
 import com.mazemaster.ui.MazeView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -10,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -311,6 +313,127 @@ class MazeControllerTest {
         }
     }
 
+    @Test
+    void shouldTrackGenerationAndSolvingMetrics() throws InterruptedException {
+        MazeController controller = new MazeController();
+        RecordingMazeView view = new RecordingMazeView();
+        controller.setView(view);
+        controller.createNewMaze(11, 11);
+        controller.setAnimationSpeed(1);
+        controller.setSolvingAlgorithm("Breadth First Search");
+
+        try {
+            controller.generateMaze();
+            await(() -> !controller.isGenerating());
+
+            MazeMetrics afterGeneration = controller.getMetrics();
+            assertThat(afterGeneration.generationTimeMillis()).isGreaterThanOrEqualTo(0L);
+            assertThat(afterGeneration.solvingTimeMillis()).isEqualTo(MazeMetrics.NOT_RECORDED);
+            assertThat(afterGeneration.walkableCells()).isEqualTo(countWalkableCells(controller.getMaze()));
+            assertThat(afterGeneration.walkableCells()).isPositive();
+            assertThat(afterGeneration.solvingAttempted()).isFalse();
+
+            controller.solveMaze();
+            await(() -> !controller.isSolving());
+
+            MazeMetrics afterSolving = controller.getMetrics();
+            assertThat(afterSolving.generationTimeMillis()).isEqualTo(afterGeneration.generationTimeMillis());
+            assertThat(afterSolving.solvingTimeMillis()).isGreaterThanOrEqualTo(0L);
+            assertThat(afterSolving.walkableCells()).isEqualTo(afterGeneration.walkableCells());
+            assertThat(afterSolving.exploredCells()).isPositive();
+            assertThat(afterSolving.exploredCells()).isLessThanOrEqualTo(afterSolving.walkableCells());
+            assertThat(afterSolving.pathLength()).isPositive();
+            assertThat(afterSolving.solvingAttempted()).isTrue();
+            assertThat(afterSolving.solved()).isTrue();
+            assertThat(view.latestMetrics.get()).isEqualTo(afterSolving);
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldClearSolvingMetricsWhenSolutionIsCleared() throws InterruptedException {
+        MazeController controller = new MazeController();
+        controller.createNewMaze(11, 11);
+        controller.setAnimationSpeed(1);
+        controller.setSolvingAlgorithm("Breadth First Search");
+
+        try {
+            controller.generateMaze();
+            await(() -> !controller.isGenerating());
+            long generationTimeMillis = controller.getMetrics().generationTimeMillis();
+
+            controller.solveMaze();
+            await(() -> !controller.isSolving());
+            assertThat(controller.getMetrics().solvingAttempted()).isTrue();
+
+            controller.clearSolution();
+
+            MazeMetrics metrics = controller.getMetrics();
+            assertThat(metrics.generationTimeMillis()).isEqualTo(generationTimeMillis);
+            assertThat(metrics.solvingTimeMillis()).isEqualTo(MazeMetrics.NOT_RECORDED);
+            assertThat(metrics.walkableCells()).isPositive();
+            assertThat(metrics.exploredCells()).isZero();
+            assertThat(metrics.pathLength()).isZero();
+            assertThat(metrics.solvingAttempted()).isFalse();
+            assertThat(metrics.solved()).isFalse();
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldResetMetricsWhenCreatingNewMaze() throws InterruptedException {
+        MazeController controller = new MazeController();
+        controller.createNewMaze(11, 11);
+        controller.setAnimationSpeed(1);
+
+        try {
+            controller.generateMaze();
+            await(() -> !controller.isGenerating());
+            assertThat(controller.getMetrics().generationTimeMillis()).isGreaterThanOrEqualTo(0L);
+
+            controller.createNewMaze(7, 7);
+
+            assertThat(controller.getMetrics()).isEqualTo(MazeMetrics.empty());
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
+    void shouldResetMetricsWhenLoadingMaze(@TempDir Path tempDir) throws InterruptedException {
+        MazeController controller = new MazeController();
+        Path saveFile = tempDir.resolve("maze.maze");
+        controller.createNewMaze(7, 7);
+        controller.setAnimationSpeed(1);
+        controller.setSolvingAlgorithm("Breadth First Search");
+
+        try {
+            controller.generateMaze();
+            await(() -> !controller.isGenerating());
+            controller.saveMaze(saveFile);
+
+            controller.solveMaze();
+            await(() -> !controller.isSolving());
+            assertThat(controller.getMetrics().solvingAttempted()).isTrue();
+
+            controller.loadMaze(saveFile);
+
+            MazeMetrics metrics = controller.getMetrics();
+            assertThat(metrics.generationTimeMillis()).isEqualTo(MazeMetrics.NOT_RECORDED);
+            assertThat(metrics.solvingTimeMillis()).isEqualTo(MazeMetrics.NOT_RECORDED);
+            assertThat(metrics.walkableCells()).isEqualTo(countWalkableCells(controller.getMaze()));
+            assertThat(metrics.walkableCells()).isPositive();
+            assertThat(metrics.exploredCells()).isZero();
+            assertThat(metrics.pathLength()).isZero();
+            assertThat(metrics.solvingAttempted()).isFalse();
+            assertThat(metrics.solved()).isFalse();
+        } finally {
+            controller.shutdown();
+        }
+    }
+
     private static void await(BooleanSupplier condition) throws InterruptedException {
         long deadline = System.currentTimeMillis() + 5_000;
         while (!condition.getAsBoolean() && System.currentTimeMillis() < deadline) {
@@ -362,6 +485,18 @@ class MazeControllerTest {
             for (int col = 0; col < maze.getColumns(); col++) {
                 int cell = maze.getCell(row, col);
                 if (cell == Maze.PATH || cell == Maze.VISITED || cell == Maze.START) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static int countWalkableCells(Maze maze) {
+        int count = 0;
+        for (int row = 0; row < maze.getRows(); row++) {
+            for (int col = 0; col < maze.getColumns(); col++) {
+                if (maze.isWalkable(row, col)) {
                     count++;
                 }
             }
@@ -488,6 +623,7 @@ class MazeControllerTest {
     private static class RecordingMazeView extends NoOpMazeView {
         private final AtomicInteger generationCompleted = new AtomicInteger();
         private final AtomicInteger solvingCompleted = new AtomicInteger();
+        private final AtomicReference<MazeMetrics> latestMetrics = new AtomicReference<>(MazeMetrics.empty());
 
         @Override
         public void onGenerationCompleted() {
@@ -497,6 +633,11 @@ class MazeControllerTest {
         @Override
         public void onSolvingCompleted(boolean solved) {
             solvingCompleted.incrementAndGet();
+        }
+
+        @Override
+        public void updateMetrics(MazeMetrics metrics) {
+            latestMetrics.set(metrics);
         }
     }
 }

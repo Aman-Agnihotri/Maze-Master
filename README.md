@@ -29,6 +29,7 @@ Maze Master is a Java Swing desktop app for generating, solving, saving, and exp
 - Move the start and goal markers directly on the generated maze
 - Save and load maze files with seed, algorithm, start, and goal metadata
 - Export the current maze as PNG or the most recent animation as GIF
+- Track generation time, solving time, walkable cells, explored cells, explored percentage, path length, and result
 - Persist window size, position, zoom level, and animation speed
 
 ## Quick Start
@@ -83,6 +84,7 @@ On Windows, use `gradlew.bat` instead of `./gradlew`.
 | Mouse wheel | Zoom the maze view in or out |
 | Seed `Random` | Generate a new random seed value |
 | Seed `Create` | Generate a maze from the current seed and dimensions |
+| Metrics panel | Shows generation time, solving time, walkable cells, explored percentage, path length, and result |
 
 ### Reset Behavior
 
