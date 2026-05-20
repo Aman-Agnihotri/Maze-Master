@@ -261,28 +261,15 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             if (wasGenerationPaused) {
                 // A paused generation leaves a partial maze. Reset to a blank structure for a clean start.
                 maze.reset();
-                if (view != null) {
-                    view.updateMaze(maze);
-                    view.refresh();
-                    view.updateControlsState(false, false);
-                }
             } else if (wasSolvingPaused || isMazeFullyGenerated()) {
                 // Solving paused OR maze is fully generated: clear only solver markings.
                 maze.resetSolution();
-                if (view != null) {
-                    view.updateMaze(maze);
-                    view.refresh();
-                    view.updateControlsState(false, false);
-                }
             } else {
                 // Blank or incomplete idle maze: reset to all walls.
                 maze.reset();
-                if (view != null) {
-                    view.updateMaze(maze);
-                    view.refresh();
-                    view.updateControlsState(false, false);
-                }
             }
+
+            updateViewAfterMazeReset();
         }
     }
     
@@ -562,6 +549,14 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
 
     private long createRandomSeed() {
         return ThreadLocalRandom.current().nextLong();
+    }
+
+    private void updateViewAfterMazeReset() {
+        if (view != null) {
+            view.updateMaze(maze);
+            view.refresh();
+            view.updateControlsState(false, false);
+        }
     }
 
     private boolean setEndpointCell(int row, int col, boolean startCell) {

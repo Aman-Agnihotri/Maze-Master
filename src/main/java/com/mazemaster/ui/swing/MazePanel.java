@@ -11,7 +11,7 @@ import java.awt.*;
  */
 public class MazePanel extends JPanel {
     
-    private Maze maze;
+    private transient Maze maze;
     private final Color[] colors;
     private int cellSize = 12;
     private static final int MIN_CELL_SIZE = 2;

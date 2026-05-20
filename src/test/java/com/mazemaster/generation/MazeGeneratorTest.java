@@ -25,20 +25,7 @@ class MazeGeneratorTest {
         AtomicInteger completionCount = new AtomicInteger();
 
         generator.setDelay(1);
-        generator.setGenerationListener(new MazeGenerationListener() {
-            @Override
-            public void onCellChanged(int row, int col, int newValue) {
-            }
-
-            @Override
-            public void onGenerationStep() {
-            }
-
-            @Override
-            public void onGenerationComplete() {
-                completionCount.incrementAndGet();
-            }
-        });
+        generator.setGenerationListener(new RecordingGenerationListener(completionCount));
 
         generator.generate(maze, algorithm, new AtomicBoolean(false), new AtomicBoolean(false));
 
@@ -92,5 +79,32 @@ class MazeGeneratorTest {
         }
 
         return false;
+    }
+
+    private static class RecordingGenerationListener implements MazeGenerationListener {
+        private final AtomicInteger completionCount;
+
+        RecordingGenerationListener(AtomicInteger completionCount) {
+            this.completionCount = completionCount;
+        }
+
+        @Override
+        public void onCellChanged(int row, int col, int newValue) {
+            ignoreCallback();
+        }
+
+        @Override
+        public void onGenerationStep() {
+            ignoreCallback();
+        }
+
+        @Override
+        public void onGenerationComplete() {
+            completionCount.incrementAndGet();
+        }
+
+        private void ignoreCallback() {
+            // These tests only assert generation completion; per-cell callbacks are intentionally ignored.
+        }
     }
 }

@@ -374,54 +374,60 @@ class MazeControllerTest {
         int count(Maze maze);
     }
 
-    private static class RecordingMazeView implements MazeView {
-        private final AtomicInteger generationCompleted = new AtomicInteger();
-        private final AtomicInteger solvingCompleted = new AtomicInteger();
-
+    private static class NoOpMazeView implements MazeView {
         @Override
         public void updateMaze(Maze maze) {
+            ignoreCallback();
         }
 
         @Override
         public void refresh() {
+            ignoreCallback();
         }
 
         @Override
         public void onCellChanged(int row, int col, int newValue) {
+            ignoreCallback();
         }
 
         @Override
         public void onGenerationStarted() {
+            ignoreCallback();
         }
 
         @Override
         public void onGenerationCompleted() {
-            generationCompleted.incrementAndGet();
+            ignoreCallback();
         }
 
         @Override
         public void onSolvingStarted() {
+            ignoreCallback();
         }
 
         @Override
         public void onSolvingCompleted(boolean solved) {
-            solvingCompleted.incrementAndGet();
+            ignoreCallback();
         }
 
         @Override
         public void onPathFound(List<Point> path) {
+            ignoreCallback();
         }
 
         @Override
         public void onOperationPaused() {
+            ignoreCallback();
         }
 
         @Override
         public void onOperationResumed() {
+            ignoreCallback();
         }
 
         @Override
         public void showMessage(String message, boolean isError) {
+            ignoreCallback();
         }
 
         @Override
@@ -431,30 +437,37 @@ class MazeControllerTest {
 
         @Override
         public void showProgress(boolean show, String message) {
+            ignoreCallback();
         }
 
         @Override
         public void updateGenerationAlgorithms(Set<String> algorithms) {
+            ignoreCallback();
         }
 
         @Override
         public void updateSolvingAlgorithms(Set<String> algorithms) {
+            ignoreCallback();
         }
 
         @Override
         public void setSelectedGenerationAlgorithm(String algorithm) {
+            ignoreCallback();
         }
 
         @Override
         public void setGenerationSeed(long seed) {
+            ignoreCallback();
         }
 
         @Override
         public void setSelectedSolvingAlgorithm(String algorithm) {
+            ignoreCallback();
         }
 
         @Override
         public void updateControlsState(boolean isGenerating, boolean isSolving) {
+            ignoreCallback();
         }
 
         @Override
@@ -465,6 +478,25 @@ class MazeControllerTest {
         @Override
         public String getExportFilename() {
             return null;
+        }
+
+        private void ignoreCallback() {
+            // This test adapter intentionally ignores callbacks that are not asserted by a given test.
+        }
+    }
+
+    private static class RecordingMazeView extends NoOpMazeView {
+        private final AtomicInteger generationCompleted = new AtomicInteger();
+        private final AtomicInteger solvingCompleted = new AtomicInteger();
+
+        @Override
+        public void onGenerationCompleted() {
+            generationCompleted.incrementAndGet();
+        }
+
+        @Override
+        public void onSolvingCompleted(boolean solved) {
+            solvingCompleted.incrementAndGet();
         }
     }
 }

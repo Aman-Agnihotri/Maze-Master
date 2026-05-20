@@ -68,19 +68,26 @@ class MazeSolverTest {
 
         @Override
         public void onCellExplored(int row, int col) {
+            ignoreCallback();
         }
 
         @Override
         public void onCellBacktracked(int row, int col) {
+            ignoreCallback();
         }
 
         @Override
         public void onPathFound(List<Point> path) {
+            ignoreCallback();
         }
 
         @Override
         public void onSolvingComplete(boolean solved) {
             completionResults.add(solved);
+        }
+
+        private void ignoreCallback() {
+            // These tests only assert solving completion; exploration callbacks are intentionally ignored.
         }
     }
 }
