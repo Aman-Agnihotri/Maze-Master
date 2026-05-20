@@ -188,6 +188,27 @@ class MazeControllerTest {
     }
 
     @Test
+    void shouldNotSolveBlankMaze() {
+        MazeController controller = new MazeController();
+        RecordingMazeView view = new RecordingMazeView();
+        controller.setView(view);
+        controller.createNewMaze(7, 7);
+
+        try {
+            assertThat(controller.canSolveMaze()).isFalse();
+
+            controller.solveMaze();
+
+            assertThat(controller.isSolving()).isFalse();
+            assertThat(view.solvingCompleted.get()).isZero();
+            assertThat(view.latestMessage.get()).isEqualTo("Generate a reachable maze before solving.");
+            assertThat(view.latestMessageWasError.get()).isFalse();
+        } finally {
+            controller.shutdown();
+        }
+    }
+
+    @Test
     void shouldSaveAndLoadMazeUsingExplicitFileFormat(@TempDir Path tempDir) {
         MazeController controller = new MazeController();
         Path saveFile = tempDir.resolve("maze.maze");
@@ -624,6 +645,8 @@ class MazeControllerTest {
         private final AtomicInteger generationCompleted = new AtomicInteger();
         private final AtomicInteger solvingCompleted = new AtomicInteger();
         private final AtomicReference<MazeMetrics> latestMetrics = new AtomicReference<>(MazeMetrics.empty());
+        private final AtomicReference<String> latestMessage = new AtomicReference<>("");
+        private final AtomicReference<Boolean> latestMessageWasError = new AtomicReference<>(false);
 
         @Override
         public void onGenerationCompleted() {
@@ -638,6 +661,12 @@ class MazeControllerTest {
         @Override
         public void updateMetrics(MazeMetrics metrics) {
             latestMetrics.set(metrics);
+        }
+
+        @Override
+        public void showMessage(String message, boolean isError) {
+            latestMessage.set(message);
+            latestMessageWasError.set(isError);
         }
     }
 }

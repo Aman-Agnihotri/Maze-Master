@@ -85,6 +85,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private static final String PREF_WINDOW_MAXIMIZED = "window.maximized";
     private static final String PREF_ZOOM_LEVEL = "maze.zoom.level";
     private static final String PREF_ANIMATION_SPEED = "animation.speed";
+    private static final String PREF_SHOW_WELCOME = "welcome.show";
     private static final int GIF_FRAME_DELAY_MS = 80;
     private static final int MAX_GIF_FRAMES = 240;
     private static final int MAX_GIF_DIMENSION = 900;
@@ -216,6 +217,32 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         // Save animation speed
         if (speedSlider != null) {
             prefs.putInt(PREF_ANIMATION_SPEED, speedSlider.getValue());
+        }
+    }
+
+    public void showWelcomeMessageIfNeeded() {
+        if (!prefs.getBoolean(PREF_SHOW_WELCOME, true)) {
+            return;
+        }
+
+        JCheckBox dontShowAgain = new JCheckBox("Don't show this again");
+        JPanel content = new JPanel(new BorderLayout(0, 12));
+        JLabel message = new JLabel("""
+            <html>
+            <h2>Welcome to Maze Master</h2>
+            <p>Start with <b>New Maze</b> to set size, then <b>Generate</b>.</p>
+            <p>Use the seed field to recreate a maze later.</p>
+            <p>Click the green or red endpoint marker to move it.</p>
+            </html>
+            """);
+
+        content.add(message, BorderLayout.CENTER);
+        content.add(dontShowAgain, BorderLayout.SOUTH);
+
+        JOptionPane.showMessageDialog(this, content, "Maze Master", JOptionPane.INFORMATION_MESSAGE);
+
+        if (dontShowAgain.isSelected()) {
+            prefs.putBoolean(PREF_SHOW_WELCOME, false);
         }
     }
     
@@ -518,6 +545,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
                     columnsField.setText(String.valueOf(maze.getColumns()));
                     seedField.setText(String.valueOf(controller.getCurrentGenerationSeed()));
                 }
+                updateControlsState(controller.isGenerating(), controller.isSolving());
             });
         }
     }
@@ -622,9 +650,10 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     @Override
     public void showMessage(String message, boolean isError) {
         SwingUtilities.invokeLater(() -> {
-            int messageType = isError ? JOptionPane.ERROR_MESSAGE : JOptionPane.INFORMATION_MESSAGE;
-            JOptionPane.showMessageDialog(this, message, 
-                isError ? "Error" : "Information", messageType);
+            statusLabel.setText(message);
+            if (isError) {
+                JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+            }
         });
     }
     
@@ -756,7 +785,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private void updateMainButtons(boolean isBusy) {
         newMazeButton.setEnabled(!isBusy);
         generateButton.setEnabled(!isBusy);
-        solveButton.setEnabled(!isBusy && controller.getMaze() != null);
+        solveButton.setEnabled(!isBusy && controller.canSolveMaze());
         saveButton.setEnabled(!isBusy && controller.getMaze() != null);
         loadButton.setEnabled(!isBusy);
         exportButton.setEnabled(!isBusy && controller.getMaze() != null);
@@ -872,7 +901,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         } else if (source == generateButton) {
             handleGenerateAction();
         } else if (source == solveButton) {
-            controller.solveMaze();
+            handleSolveAction();
         } else if (source == pauseResumeButton) {
             controller.pauseResumeCurrentOperation();
         } else if (source == resetButton) {
@@ -907,6 +936,14 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private void handleGenerateAction() {
         if (applySeedFromField()) {
             controller.generateMaze();
+        }
+    }
+
+    private void handleSolveAction() {
+        if (controller.canSolveMaze()) {
+            controller.solveMaze();
+        } else {
+            statusLabel.setText("Generate a reachable maze before solving");
         }
     }
 
@@ -970,6 +1007,11 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
 
         if (selectedEndpoint == EndpointSelection.NONE) {
             statusLabel.setText("Click the start or goal marker first");
+            return;
+        }
+
+        if (!maze.isWalkable(cell.x, cell.y)) {
+            statusLabel.setText("Choose an open cell for the selected endpoint");
             return;
         }
 

@@ -11,21 +11,6 @@ import javax.swing.*;
  * Sets up the MVC architecture and launches the application.
  */
 public class MazeMasterApplication {
-
-    private static final String WELCOME_MESSAGE = """
-                Welcome to Maze Master - Definitive Edition!
-
-                Features:
-                • Multiple generation algorithms
-                • Advanced solving algorithms (DFS, BFS, A*)
-                • Real-time visualization
-                • Save/Load functionality
-                • Export to images
-                • Mouse wheel zooming
-
-                Click 'Generate' to create your first maze!
-                """;
-    
     public static void main(String[] args) {
         // Set system properties for better UI experience
         System.setProperty("awt.useSystemAAFontSettings", "on");
@@ -72,8 +57,6 @@ public class MazeMasterApplication {
         
         // Show the application
         view.setVisible(true);
-        
-        // Optional: Show welcome message
-        SwingUtilities.invokeLater(() -> view.showMessage(WELCOME_MESSAGE, false));
+        SwingUtilities.invokeLater(view::showWelcomeMessageIfNeeded);
     }
 }

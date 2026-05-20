@@ -75,7 +75,7 @@ On Windows, use `gradlew.bat` instead of `./gradlew`.
 | --- | --- |
 | `New Maze` | Create a blank maze workspace from the current dimensions |
 | `Generate` | Generate a maze with the selected generation algorithm |
-| `Solve` | Solve the current generated maze with the selected solving algorithm |
+| `Solve` | Solve the current generated, reachable maze with the selected solving algorithm |
 | `Pause` / `Resume` | Pause or resume the active generation/solving operation |
 | `Reset` | Clear the solution, or clear an unfinished/paused generation |
 | `Save` / `Load` | Persist or restore a maze file |

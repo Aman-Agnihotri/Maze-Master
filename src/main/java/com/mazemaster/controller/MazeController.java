@@ -111,6 +111,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             view.updateMaze(maze);
             view.setGenerationSeed(currentGenerationSeed);
             view.refresh();
+            view.updateControlsState(false, false);
         }
     }
 
@@ -160,6 +161,14 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     
     public void solveMaze() {
         if (isGenerating || isSolving || maze == null) {
+            return;
+        }
+
+        if (!canSolveMaze()) {
+            if (view != null) {
+                view.showMessage("Generate a reachable maze before solving.", false);
+                view.updateControlsState(false, false);
+            }
             return;
         }
         
@@ -339,6 +348,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             if (view != null) {
                 view.updateMaze(maze);
                 view.refresh();
+                view.updateControlsState(false, false);
             }
         }
     }
@@ -350,6 +360,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
             if (view != null) {
                 view.updateMaze(maze);
                 view.refresh();
+                view.updateControlsState(false, false);
             }
         }
     }
@@ -405,6 +416,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                 view.setGenerationSeed(currentGenerationSeed);
                 view.setSelectedGenerationAlgorithm(currentGenerationAlgorithm);
                 view.refresh();
+                view.updateControlsState(false, false);
                 view.showMessage("Maze loaded successfully!", false);
             }
         } catch (IOException e) {
@@ -464,6 +476,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
     public boolean isGenerationPaused() { return isGenerationPaused; }
     public boolean isSolvingPaused() { return isSolvingPaused; }
     public boolean isAnyOperationPaused() { return isGenerationPaused || isSolvingPaused; }
+    public boolean canSolveMaze() { return !isBusy() && isMazeFullyGenerated(); }
     
     public Maze getMaze() { return maze; }
     public String getCurrentGenerationAlgorithm() { return currentGenerationAlgorithm; }
@@ -610,6 +623,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
         if (updated && view != null) {
             view.updateMaze(maze);
             view.refresh();
+            view.updateControlsState(false, false);
         }
         return updated;
     }
