@@ -151,6 +151,8 @@ src/main/java/com/mazemaster/
 
 The controller coordinates user actions, background execution, persistence, and view updates. Generation and solving are delegated to strategy classes through small context objects that provide callbacks, pause/resume checks, cancellation checks, and animation timing.
 
+Detailed architecture notes are available in [docs/architecture.md](docs/architecture.md).
+
 ## Persistence Format
 
 Maze files use a text format managed by `MazeFileService`. The current format stores:
