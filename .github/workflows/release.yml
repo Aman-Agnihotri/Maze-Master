@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, for example v2.0.1
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build release artifacts
+        run: ./gradlew clean build --warning-mode all
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          APP_VERSION="${RELEASE_TAG#v}"
+          RELEASE_ASSETS=(
+            "build/libs/maze-master-${APP_VERSION}.jar"
+            "build/distributions/maze-master-${APP_VERSION}.zip"
+            "build/distributions/maze-master-${APP_VERSION}.tar"
+          )
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${RELEASE_ASSETS[@]}" --clobber
+          else
+            gh release create "$RELEASE_TAG" "${RELEASE_ASSETS[@]}" \
+              --title "Maze Master $RELEASE_TAG" \
+              --generate-notes
+          fi

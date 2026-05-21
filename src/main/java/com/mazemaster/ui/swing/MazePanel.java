@@ -16,6 +16,12 @@ public class MazePanel extends JPanel {
     private int cellSize = 12;
     private static final int MIN_CELL_SIZE = 2;
     private static final int MAX_CELL_SIZE = 50;
+    private static final Color START_MARKER_COLOR = new Color(22, 163, 74);
+    private static final Color GOAL_MARKER_COLOR = new Color(220, 38, 38);
+    private static final Color SELECTION_RING_COLOR = new Color(250, 204, 21);
+    private static final Color MARKER_BORDER_COLOR = new Color(17, 24, 39, 180);
+    private static final Color GRID_COLOR = new Color(17, 24, 39, 38);
+    private static final Color EMPTY_STATE_COLOR = new Color(100, 116, 139);
     
     // Rendering settings
     private boolean antialiasing = true;
@@ -28,6 +34,7 @@ public class MazePanel extends JPanel {
         setBackground(colors[Maze.BACKGROUND]);
         setOpaque(true);
         setToolTipText("");
+        setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
         
         // Add mouse wheel listener for zooming
         addMouseWheelListener(e -> {
@@ -58,15 +65,15 @@ public class MazePanel extends JPanel {
     }
 
     private void notifyZoomChanged() {
-    // Find the parent SwingMazeView and save settings
-    Container parent = getParent();
-    while (parent != null && !(parent instanceof SwingMazeView)) {
-        parent = parent.getParent();
+        // Find the parent SwingMazeView and save settings
+        Container parent = getParent();
+        while (parent != null && !(parent instanceof SwingMazeView)) {
+            parent = parent.getParent();
+        }
+        if (parent instanceof SwingMazeView swingMazeView) {
+            swingMazeView.saveWindowSettings();
+        }
     }
-    if (parent instanceof SwingMazeView swingMazeView) {
-        swingMazeView.saveWindowSettings();
-    }
-}
     
     public void zoomIn() {
         if (cellSize < MAX_CELL_SIZE) {
@@ -143,7 +150,7 @@ public class MazePanel extends JPanel {
     }
     
     private void drawEmptyState(Graphics g) {
-        g.setColor(Color.GRAY);
+        g.setColor(EMPTY_STATE_COLOR);
         String message = "No maze loaded";
         FontMetrics fm = g.getFontMetrics();
         int x = (getWidth() - fm.stringWidth(message)) / 2;
@@ -214,14 +221,14 @@ public class MazePanel extends JPanel {
         int startRow = maze.getStartRow();
         int startCol = maze.getStartCol();
         if (maze.isWalkable(startRow, startCol)) {
-            drawSpecialMarker(g2d, startRow, startCol, Color.GREEN, "S", startEndpointSelected);
+            drawSpecialMarker(g2d, startRow, startCol, START_MARKER_COLOR, "S", startEndpointSelected);
         }
         
         // Highlight goal position
         int goalRow = maze.getGoalRow();
         int goalCol = maze.getGoalCol();
         if (maze.isWalkable(goalRow, goalCol)) {
-            drawSpecialMarker(g2d, goalRow, goalCol, Color.RED, "G", goalEndpointSelected);
+            drawSpecialMarker(g2d, goalRow, goalCol, GOAL_MARKER_COLOR, "G", goalEndpointSelected);
         }
     }
     
@@ -229,16 +236,13 @@ public class MazePanel extends JPanel {
         int x = col * cellSize;
         int y = row * cellSize;
         
-        // Draw colored circle
-        g2d.setColor(color);
         int margin = Math.max(1, cellSize / 6);
-        g2d.fillOval(x + margin, y + margin, cellSize - 2 * margin, cellSize - 2 * margin);
 
         if (selected) {
             Stroke originalStroke = g2d.getStroke();
-            g2d.setColor(Color.BLACK);
-            g2d.setStroke(new BasicStroke(Math.max(2, cellSize / 8f)));
-            int ringMargin = Math.max(1, cellSize / 10);
+            g2d.setColor(SELECTION_RING_COLOR);
+            g2d.setStroke(new BasicStroke(Math.max(2, cellSize / 7f)));
+            int ringMargin = Math.max(1, cellSize / 12);
             g2d.drawOval(
                 x + ringMargin,
                 y + ringMargin,
@@ -247,6 +251,12 @@ public class MazePanel extends JPanel {
             );
             g2d.setStroke(originalStroke);
         }
+
+        // Draw colored circle
+        g2d.setColor(color);
+        g2d.fillOval(x + margin, y + margin, cellSize - 2 * margin, cellSize - 2 * margin);
+        g2d.setColor(MARKER_BORDER_COLOR);
+        g2d.drawOval(x + margin, y + margin, cellSize - 2 * margin, cellSize - 2 * margin);
         
         // Draw text if cell is large enough
         if (cellSize >= 16) {
@@ -263,7 +273,7 @@ public class MazePanel extends JPanel {
     }
     
     private void drawGrid(Graphics2D g2d) {
-        g2d.setColor(new Color(0, 0, 0, 50)); // Semi-transparent black
+        g2d.setColor(GRID_COLOR);
         g2d.setStroke(new BasicStroke(1));
         
         int rows = maze.getRows();

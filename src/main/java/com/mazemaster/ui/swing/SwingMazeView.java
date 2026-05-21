@@ -9,10 +9,13 @@ import com.mazemaster.ui.MazeView;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.border.TitledBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -23,10 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-
 import java.util.prefs.Preferences;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 
 /**
  * Swing implementation of the MazeView interface.
@@ -89,16 +89,27 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private static final int GIF_FRAME_DELAY_MS = 80;
     private static final int MAX_GIF_FRAMES = 240;
     private static final int MAX_GIF_DIMENSION = 900;
+
+    private static final Color APP_BACKGROUND = new Color(236, 240, 244);
+    private static final Color PANEL_BACKGROUND = new Color(248, 250, 252);
+    private static final Color STATUS_BACKGROUND = new Color(229, 235, 242);
+    private static final Color CONTROL_BORDER_COLOR = new Color(185, 197, 211);
+    private static final Color TEXT_COLOR = new Color(31, 41, 55);
+    private static final Color MUTED_TEXT_COLOR = new Color(75, 85, 99);
+    private static final Color BUTTON_BACKGROUND = new Color(241, 245, 249);
+    private static final Color BUTTON_BORDER_COLOR = new Color(148, 163, 184);
+    private static final Font CONTROL_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, 12);
+    private static final Font CONTROL_FONT_BOLD = CONTROL_FONT.deriveFont(Font.BOLD);
     
     // Color scheme
     private final Color[] mazeColors = {
-        new Color(240, 240, 240), // Background
-        new Color(60, 60, 60),    // Wall - dark gray
-        new Color(100, 150, 255), // Path - blue
-        Color.WHITE,              // Empty - white
-        new Color(200, 200, 200), // Visited - light gray
-        new Color(50, 200, 50),   // Start/Final path - green
-        new Color(255, 100, 100)  // Goal - red
+        new Color(243, 246, 249), // Background
+        new Color(35, 42, 52),    // Wall
+        new Color(37, 99, 235),   // Path
+        new Color(252, 252, 249), // Empty
+        new Color(170, 183, 198), // Visited
+        new Color(22, 163, 74),   // Start/final path
+        new Color(220, 38, 38)    // Goal
     };
     
     public SwingMazeView(MazeController controller) {
@@ -111,14 +122,17 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     }
     
     private void initializeUI() {
-        setTitle("Maze Master - Definitive Edition");
+        setTitle("Maze Master");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
+        getContentPane().setBackground(APP_BACKGROUND);
         
         // Create maze panel
         mazePanel = new MazePanel(mazeColors);
         JScrollPane scrollPane = new JScrollPane(mazePanel);
         scrollPane.setPreferredSize(new Dimension(800, 600));
+        scrollPane.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, CONTROL_BORDER_COLOR));
+        scrollPane.getViewport().setBackground(mazeColors[Maze.BACKGROUND]);
         add(scrollPane, BorderLayout.CENTER);
         
         // Create control panels
@@ -247,8 +261,12 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     }
     
     private JPanel createTopControlPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        panel.setBorder(BorderFactory.createEtchedBorder());
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        panel.setBackground(PANEL_BACKGROUND);
+        panel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, CONTROL_BORDER_COLOR),
+            BorderFactory.createEmptyBorder(0, 4, 0, 4)
+        ));
         
         // Main action buttons
         newMazeButton = createButton("New Maze", "Create a blank maze workspace with custom dimensions");
@@ -285,8 +303,12 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JPanel createSideControlPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(BorderFactory.createTitledBorder("Settings"));
-        panel.setPreferredSize(new Dimension(250, 0));
+        panel.setBackground(PANEL_BACKGROUND);
+        panel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 0, 1, CONTROL_BORDER_COLOR),
+            BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
+        panel.setPreferredSize(new Dimension(260, 0));
         
         // Algorithm selection
         panel.add(createAlgorithmPanel());
@@ -313,7 +335,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JPanel createSeedPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        panel.setBorder(BorderFactory.createTitledBorder("Seed"));
+        styleTitledPanel(panel, "Seed");
 
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.anchor = GridBagConstraints.WEST;
@@ -349,7 +371,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JPanel createMetricsPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        panel.setBorder(BorderFactory.createTitledBorder("Metrics"));
+        styleTitledPanel(panel, "Metrics");
 
         gbc.insets = new Insets(3, 5, 3, 5);
         gbc.anchor = GridBagConstraints.WEST;
@@ -376,6 +398,8 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
 
     private JLabel createMetricValueLabel() {
         JLabel label = new JLabel("-");
+        label.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        label.setForeground(TEXT_COLOR);
         label.setHorizontalAlignment(SwingConstants.RIGHT);
         return label;
     }
@@ -397,7 +421,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JPanel createAlgorithmPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        panel.setBorder(BorderFactory.createTitledBorder("Algorithms"));
+        styleTitledPanel(panel, "Algorithms");
         
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.anchor = GridBagConstraints.WEST;
@@ -429,7 +453,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     private JPanel createDimensionsPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        panel.setBorder(BorderFactory.createTitledBorder("Dimensions"));
+        styleTitledPanel(panel, "Dimensions");
         
         gbc.insets = new Insets(5, 5, 5, 5);
         
@@ -454,9 +478,10 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     
     private JPanel createSpeedPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(BorderFactory.createTitledBorder("Animation Speed"));
+        styleTitledPanel(panel, "Animation Speed");
 
         speedSlider = new JSlider(JSlider.VERTICAL, 1, 100, 30);
+        speedSlider.setBackground(PANEL_BACKGROUND);
         speedSlider.setMajorTickSpacing(25);
         speedSlider.setMinorTickSpacing(5);
         speedSlider.setPaintTicks(true);
@@ -477,9 +502,12 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
     
     private JPanel createBottomStatusPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(BorderFactory.createEtchedBorder());
+        panel.setBackground(STATUS_BACKGROUND);
+        panel.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, CONTROL_BORDER_COLOR));
         
         statusLabel = new JLabel("Ready");
+        statusLabel.setFont(CONTROL_FONT_BOLD);
+        statusLabel.setForeground(MUTED_TEXT_COLOR);
         statusLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
         panel.add(statusLabel, BorderLayout.WEST);
         
@@ -491,7 +519,31 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
         button.setToolTipText(tooltip);
         button.addActionListener(this);
         button.setFocusPainted(false);
+        button.setOpaque(true);
+        button.setContentAreaFilled(true);
+        button.setFont(CONTROL_FONT_BOLD);
+        button.setForeground(TEXT_COLOR);
+        button.setBackground(BUTTON_BACKGROUND);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BUTTON_BORDER_COLOR),
+            BorderFactory.createEmptyBorder(4, 10, 4, 10)
+        ));
+        button.setMargin(new Insets(4, 10, 4, 10));
         return button;
+    }
+
+    private void styleTitledPanel(JPanel panel, String title) {
+        panel.setBackground(PANEL_BACKGROUND);
+        TitledBorder titleBorder = BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(CONTROL_BORDER_COLOR),
+            title
+        );
+        titleBorder.setTitleFont(CONTROL_FONT_BOLD);
+        titleBorder.setTitleColor(MUTED_TEXT_COLOR);
+        panel.setBorder(BorderFactory.createCompoundBorder(
+            titleBorder,
+            BorderFactory.createEmptyBorder(4, 4, 6, 4)
+        ));
     }
 
     private void setupEventHandlers() {
