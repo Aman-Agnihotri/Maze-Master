@@ -1,7 +1,7 @@
 # Maze Master
 
 [![Java](https://img.shields.io/badge/Java-17%2B-orange.svg)](https://www.oracle.com/java/)
-[![CI](https://github.com/Aman-Agnihotri/Minor_1/actions/workflows/ci.yml/badge.svg)](https://github.com/Aman-Agnihotri/Minor_1/actions/workflows/ci.yml)
+[![CI](https://github.com/Aman-Agnihotri/Maze-Master/actions/workflows/ci.yml/badge.svg)](https://github.com/Aman-Agnihotri/Maze-Master/actions/workflows/ci.yml)
 [![Gradle](https://img.shields.io/badge/Build-Gradle-blue.svg)](https://gradle.org/)
 [![Swing](https://img.shields.io/badge/UI-Java%20Swing-green.svg)](https://docs.oracle.com/javase/tutorial/uiswing/)
 [![License](https://img.shields.io/badge/License-MIT-brightgreen.svg)](LICENSE)
