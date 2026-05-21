@@ -184,17 +184,32 @@ Run all tests with:
 
 ## Release Build
 
-Create the executable JAR:
+Create release artifacts:
 
 ```bash
 ./gradlew build
 ```
 
-Run it:
+The build creates:
+
+- `build/libs/maze-master-2.0.0.jar`: standalone executable JAR
+- `build/distributions/maze-master-2.0.0.zip`: portable ZIP with launch scripts
+- `build/distributions/maze-master-2.0.0.tar`: portable TAR with launch scripts
+
+Run the standalone JAR:
 
 ```bash
 java -jar build/libs/maze-master-2.0.0.jar
 ```
+
+Run from the ZIP distribution:
+
+```bash
+unzip build/distributions/maze-master-2.0.0.zip
+./maze-master-2.0.0/bin/maze-master
+```
+
+On Windows, run `maze-master-2.0.0\bin\maze-master.bat`.
 
 ## Project History
 

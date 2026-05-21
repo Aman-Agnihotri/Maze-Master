@@ -22,6 +22,7 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:5.8.0'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
     testImplementation 'org.assertj:assertj-core:3.24.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.1'
     
     // Optional: For better testing of Swing components
     testImplementation 'org.assertj:assertj-swing-junit:3.17.1'
@@ -98,7 +99,6 @@ distributions {
     main {
         distributionBaseName = 'maze-master'
         contents {
-            from jar
             from 'README.md'
             from 'LICENSE'
         }
