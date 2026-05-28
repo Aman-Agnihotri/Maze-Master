@@ -3,6 +3,8 @@ package com.mazemaster;
 
 import com.mazemaster.controller.MazeController;
 import com.mazemaster.ui.swing.SwingMazeView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 
@@ -11,6 +13,9 @@ import javax.swing.*;
  * Sets up the MVC architecture and launches the application.
  */
 public class MazeMasterApplication {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MazeMasterApplication.class);
+
     public static void main(String[] args) {
         // Set system properties for better UI experience
         System.setProperty("awt.useSystemAAFontSettings", "on");
@@ -24,7 +29,7 @@ public class MazeMasterApplication {
             try {
                 createAndShowGUI();
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.error("Failed to start Maze Master", e);
                 JOptionPane.showMessageDialog(null, 
                     "Failed to start Maze Master: " + e.getMessage(),
                     "Startup Error", 
@@ -46,7 +51,7 @@ public class MazeMasterApplication {
             
         } catch (Exception e) {
             // If system L&F fails, continue with default
-            System.err.println("Could not set system look and feel: " + e.getMessage());
+            LOGGER.warn("Could not set system look and feel", e);
         }
     }
     

@@ -9,6 +9,8 @@ import com.mazemaster.model.MazeMetrics;
 import com.mazemaster.solving.MazeSolver;
 import com.mazemaster.solving.MazeSolvingListener;
 import com.mazemaster.ui.MazeView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.awt.Point;
 import java.io.IOException;
@@ -33,6 +35,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Follows the MVC pattern and handles application state management.
  */
 public class MazeController implements MazeGenerationListener, MazeSolvingListener {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MazeController.class);
     
     // Core components
     private Maze maze;
@@ -148,7 +152,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                 generator.generate(maze, currentGenerationAlgorithm, stopGeneration, pauseGeneration);
                 
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.error("Failed to generate maze", e);
                 if (view != null) {
                     view.showMessage("Error generating maze: " + e.getMessage(), true);
                 }
@@ -191,7 +195,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                 // Completion is reported through MazeSolvingListener to keep lifecycle events centralized.
                 
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.error("Failed to solve maze", e);
                 if (view != null) {
                     view.showMessage("Error solving maze: " + e.getMessage(), true);
                 }
@@ -386,7 +390,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                 view.showMessage("Maze saved successfully!", false);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error("Failed to save maze to {}", path, e);
             if (view != null) {
                 view.showMessage("Error saving maze: " + e.getMessage(), true);
             }
@@ -420,7 +424,7 @@ public class MazeController implements MazeGenerationListener, MazeSolvingListen
                 view.showMessage("Maze loaded successfully!", false);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error("Failed to load maze from {}", path, e);
             if (view != null) {
                 view.showMessage("Error loading maze: " + e.getMessage(), true);
             }

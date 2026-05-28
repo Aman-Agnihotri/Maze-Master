@@ -6,6 +6,8 @@ import com.mazemaster.export.AnimatedGifExporter;
 import com.mazemaster.model.Maze;
 import com.mazemaster.model.MazeMetrics;
 import com.mazemaster.ui.MazeView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -33,6 +35,8 @@ import java.util.prefs.Preferences;
  * Provides a modern, responsive user interface for the maze application.
  */
 public class SwingMazeView extends JFrame implements MazeView, ActionListener {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SwingMazeView.class);
     
     private final transient MazeController controller;
     private final transient AnimatedGifExporter gifExporter = new AnimatedGifExporter();
@@ -901,7 +905,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             
             return ImageIO.write(image, format, file);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error("Failed to export maze image to {}", filename, e);
             return false;
         }
     }
@@ -1156,7 +1160,7 @@ public class SwingMazeView extends JFrame implements MazeView, ActionListener {
             gifExporter.export(List.copyOf(animationFrames), Path.of(filename), GIF_FRAME_DELAY_MS);
             statusLabel.setText("Maze animation exported to " + filename);
         } catch (IOException | IllegalArgumentException e) {
-            e.printStackTrace();
+            LOGGER.error("Failed to export maze animation to {}", filename, e);
             showMessage("Failed to export GIF: " + e.getMessage(), true);
         }
     }
